@@ -11,43 +11,64 @@ class HomeScreen extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      backgroundColor: themeProvider.isDarkTheme
-          ? AppColors.darkScaffoldColor
-          : AppColors.lightScaffoldColor,
-
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              "Welcome to My Shop",
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: themeProvider.isDarkTheme ? Colors.white : Colors.black,
-              ),
+      body: Container(
+        // 🔥 Background image
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage("assets/images/images.jpg"), // your image
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              themeProvider.isDarkTheme 
+                ? Colors.black.withOpacity(0.5) 
+                : Colors.white.withOpacity(0.2),
+              BlendMode.darken,
             ),
+          ),
+        ),
 
-            SizedBox(height: 50),
-
-            ElevatedButton(onPressed: () {}, child: Text("Buy Now")),
-
-            SwitchListTile(
-              title: Text(
-                "Dark Mode",
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+      "assets/images/dog3.jpeg",
+      width: 150,
+     ),
+              Text(
+                "Welcome to My Shop",
                 style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
                   color: themeProvider.isDarkTheme
                       ? Colors.white
                       : Colors.black,
                 ),
               ),
-              value: themeProvider.isDarkTheme,
-              onChanged: (value) {
-                themeProvider.setDarkTheme(value);
-                print('Theme State: ${themeProvider.isDarkTheme}');
-              },
-            ),
-          ],
+
+              SizedBox(height: 50),
+
+              ElevatedButton(
+                onPressed: () {},
+                child: Text("Buy Now"),
+              ),
+
+              SwitchListTile(
+                title: Text(
+                  "Dark Mode",
+                  style: TextStyle(
+                    color: themeProvider.isDarkTheme
+                        ? Colors.white
+                        : Colors.black,
+                  ),
+                ),
+                value: themeProvider.isDarkTheme,
+                onChanged: (value) {
+                  themeProvider.setDarkTheme(value);
+                  print('Theme State: ${themeProvider.isDarkTheme}');
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
