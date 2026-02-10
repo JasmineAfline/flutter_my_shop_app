@@ -10,9 +10,11 @@ import 'package:my_shop/providers/user_provider.dart';
 
 import 'package:my_shop/screens/auth/login_screen.dart';
 import 'package:my_shop/screens/auth/register_screen.dart';
+import 'package:my_shop/screens/auth/forgot_password_screen.dart';
 import 'package:my_shop/screens/home_screen.dart';
 import 'package:my_shop/screens/profile_screen.dart';
 import 'package:my_shop/screens/admin/admin_dashboard.dart';
+import 'package:my_shop/screens/admin/screens/add_product_screen.dart';
 import 'package:my_shop/screens/admin/screens/manage_products.dart';
 import 'package:my_shop/screens/admin/screens/manage_orders.dart';
 import 'package:my_shop/screens/admin/screens/manage_users.dart';
@@ -49,51 +51,39 @@ class MyApp extends StatelessWidget {
         isDarkTheme: themeProvider.isDarkTheme,
         context: context,
       ),
-      
-      // Initial route based on auth state
       home: const AuthWrapper(),
-      
-      // Route definitions
+
       routes: {
-        LoginScreen.routName: (context) => const LoginScreen(),
-        RegisterScreen.routName: (context) => const RegisterScreen(),
-        HomeScreen.routName: (context) => const HomeScreen(),
-        ProfileScreen.routName: (context) => const ProfileScreen(),
-        RootScreen.routName: (context) => const RootScreen(),
-        AdminDashboard.routeName: (context) => const AdminDashboard(),
-        ManageProducts.routeName: (context) => const ManageProducts(),
-        ManageOrders.routeName: (context) => const ManageOrders(),
-        ManageUsers.routeName: (context) => const ManageUsers(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/forgotPassword': (context) => const ForgotPasswordScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/root': (context) => const RootScreen(),
+        '/admin': (context) => const AdminDashboard(),
+        '/addProduct': (context) => const AddProductScreen(),
+        '/manageProducts': (context) => const ManageProducts(),
+        '/manageOrders': (context) => const ManageOrders(),
+        '/manageUsers': (context) => const ManageUsers(),
       },
-      
-      // Handle unknown routes
+
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
           builder: (context) => Scaffold(
-            appBar: AppBar(
-              title: const Text('Page Not Found'),
-            ),
+            appBar: AppBar(title: const Text('Page Not Found')),
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
                     '404',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Page not found',
-                    style: TextStyle(fontSize: 18),
-                  ),
+                  const Text('Page not found', style: TextStyle(fontSize: 18)),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushReplacementNamed(context, LoginScreen.routName);
-                    },
+                    onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
                     child: const Text('Go to Login'),
                   ),
                 ],
@@ -106,7 +96,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Auth Wrapper to handle initial routing based on authentication state
+// -------------------- AUTH WRAPPER --------------------
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -115,36 +105,26 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // If user is logged in
         if (snapshot.hasData && snapshot.data != null) {
-          // Fetch user data and navigate based on role
           return FutureBuilder(
             future: _fetchUserAndNavigate(context),
             builder: (context, futureSnapshot) {
               if (futureSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
-                  body: Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  body: Center(child: CircularProgressIndicator()),
                 );
               }
-              
-              // Default to RootScreen if something goes wrong
               return const RootScreen();
             },
           );
         }
 
-        // If no user is logged in, show login screen
         return const LoginScreen();
       },
     );
@@ -154,18 +134,15 @@ class AuthWrapper extends StatelessWidget {
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.fetchUser();
-      
-      // Navigate based on role after fetching user data
+
       if (context.mounted) {
         if (userProvider.isAdmin) {
-          // Admin users go to admin dashboard
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushReplacementNamed(context, AdminDashboard.routeName);
+            Navigator.pushReplacementNamed(context, '/admin');
           });
         } else {
-          // Regular users go to root screen
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushReplacementNamed(context, RootScreen.routName);
+            Navigator.pushReplacementNamed(context, '/root');
           });
         }
       }

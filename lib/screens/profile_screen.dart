@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
-  static const routName = "/ProfileScreen";
+  static const routeName = "/ProfileScreen";
   const ProfileScreen({super.key});
 
   @override
@@ -243,7 +243,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         userProvider.clearUser();
         
         if (mounted) {
-          Navigator.pushReplacementNamed(context, LoginScreen.routName);
+          Navigator.pushReplacementNamed(context, LoginScreen.routeName);
         }
       } catch (e) {
         if (mounted) {
@@ -518,7 +518,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, LoginScreen.routName);
+                Navigator.pushReplacementNamed(context, LoginScreen.routeName);
               },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(

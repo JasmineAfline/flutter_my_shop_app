@@ -4,7 +4,7 @@ import 'package:my_shop/screens/home_screen.dart';
 import 'package:my_shop/screens/profile_screen.dart';
 
 class RootScreen extends StatefulWidget {
-  static const routName = "/RootScreen";
+  static const routeName = "/RootScreen";
   const RootScreen({super.key});
 
 

@@ -5,13 +5,15 @@ import 'package:my_shop/providers/user_provider.dart';
 import 'package:my_shop/screens/admin/screens/manage_products.dart';
 import 'package:my_shop/screens/admin/screens/manage_orders.dart';
 import 'package:my_shop/screens/admin/screens/manage_users.dart';
+import 'package:my_shop/screens/admin/screens/add_product_screen.dart';
 import 'package:my_shop/screens/admin/widgets/stat_card.dart';
 import 'package:my_shop/screens/admin/widgets/dashboard_tile.dart';
 import 'package:my_shop/screens/auth/login_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:my_shop/providers/theme_provider.dart';
 
 class AdminDashboard extends StatefulWidget {
-  static const routeName = '/AdminDashboard';
+  static const routeName = '/admin';
   const AdminDashboard({super.key});
 
   @override
@@ -33,19 +35,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _loadDashboardData() async {
     try {
-      // Get total products
-      final productsSnapshot = await FirebaseFirestore.instance
-          .collection('products')
-          .get();
+      final productsSnapshot = await FirebaseFirestore.instance.collection('products').get();
       _totalProducts = productsSnapshot.docs.length;
 
-      // Get total orders
-      final ordersSnapshot = await FirebaseFirestore.instance
-          .collection('orders')
-          .get();
+      final ordersSnapshot = await FirebaseFirestore.instance.collection('orders').get();
       _totalOrders = ordersSnapshot.docs.length;
 
-      // Calculate total revenue
       double revenue = 0.0;
       for (var doc in ordersSnapshot.docs) {
         final data = doc.data();
@@ -53,10 +48,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       }
       _totalRevenue = revenue;
 
-      // Get total users
-      final usersSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .get();
+      final usersSnapshot = await FirebaseFirestore.instance.collection('users').get();
       _totalUsers = usersSnapshot.docs.length;
 
       setState(() {
@@ -75,9 +67,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
       await FirebaseAuth.instance.signOut();
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       userProvider.clearUser();
-      
+
       if (mounted) {
-        Navigator.pushReplacementNamed(context, LoginScreen.routName);
+        Navigator.pushReplacementNamed(context, '/login');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,6 +82,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.getUser;
+    final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -99,11 +92,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              setState(() {
-                _isLoading = true;
-              });
+              setState(() => _isLoading = true);
               _loadDashboardData();
             },
+          ),
+          IconButton(
+            icon: Icon(themeProvider.isDarkTheme ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () => themeProvider.toggleTheme(),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
@@ -132,7 +127,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               radius: 30,
                               backgroundColor: Theme.of(context).colorScheme.primary,
                               child: Text(
-                                user?.username.isNotEmpty == true
+                                (user?.username.isNotEmpty ?? false)
                                     ? user!.username[0].toUpperCase()
                                     : 'A',
                                 style: const TextStyle(
@@ -149,22 +144,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 children: [
                                   Text(
                                     'Welcome back!',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Colors.grey,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(color: Colors.grey),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     user?.username ?? 'Admin',
-                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
                                     user?.email ?? '',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Colors.grey,
-                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(color: Colors.grey),
                                   ),
                                 ],
                               ),
@@ -178,9 +176,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     // Statistics Cards
                     Text(
                       'Overview',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
                     GridView.count(
@@ -222,19 +221,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     // Management Options
                     Text(
                       'Management',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
                     DashboardTile(
+                      title: 'Add Product',
+                      subtitle: 'Add a new product',
+                      icon: Icons.add_box,
+                      color: Colors.teal,
+                      onTap: () => Navigator.pushNamed(context, '/addProduct'),
+                    ),
+                    const SizedBox(height: 12),
+                    DashboardTile(
                       title: 'Manage Products',
-                      subtitle: 'Add, edit, or remove products',
+                      subtitle: 'Edit or remove products',
                       icon: Icons.inventory_2,
                       color: Colors.blue,
-                      onTap: () {
-                        Navigator.pushNamed(context, ManageProducts.routeName);
-                      },
+                      onTap: () => Navigator.pushNamed(context, '/manageProducts'),
                     ),
                     const SizedBox(height: 12),
                     DashboardTile(
@@ -242,19 +248,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       subtitle: 'View and process orders',
                       icon: Icons.shopping_bag,
                       color: Colors.orange,
-                      onTap: () {
-                        Navigator.pushNamed(context, ManageOrders.routeName);
-                      },
+                      onTap: () => Navigator.pushNamed(context, '/manageOrders'),
                     ),
                     const SizedBox(height: 12),
                     DashboardTile(
                       title: 'Manage Users',
-                      subtitle: 'View and manage user accounts',
+                      subtitle: 'View and manage users',
                       icon: Icons.people,
                       color: Colors.green,
-                      onTap: () {
-                        Navigator.pushNamed(context, ManageUsers.routeName);
-                      },
+                      onTap: () => Navigator.pushNamed(context, '/manageUsers'),
                     ),
                   ],
                 ),

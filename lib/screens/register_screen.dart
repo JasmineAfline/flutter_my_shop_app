@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class SignupScreen extends StatefulWidget {
-  static const routName = '/register';
+  static const routeName = '/register';
   const SignupScreen({super.key});
 
   @override

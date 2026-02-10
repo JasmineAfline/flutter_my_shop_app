@@ -86,7 +86,7 @@ class GoogleButton extends StatelessWidget {
         } else {
           Navigator.pushReplacementNamed(
             context,
-            RootScreen.routName,
+            RootScreen.routeName,
           );
         }
       }
