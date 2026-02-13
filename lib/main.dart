@@ -9,7 +9,7 @@ import 'package:my_shop/providers/theme_provider.dart';
 import 'package:my_shop/providers/user_provider.dart';
 
 import 'package:my_shop/screens/auth/login_screen.dart';
-import 'package:my_shop/screens/auth/register_screen.dart';
+import 'package:my_shop/screens/register_screen.dart';
 import 'package:my_shop/screens/auth/forgot_password_screen.dart';
 import 'package:my_shop/screens/home_screen.dart';
 import 'package:my_shop/screens/profile_screen.dart';

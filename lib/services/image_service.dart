@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:cloudinary/cloudinary.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;

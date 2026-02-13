@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:my_shop/screens/register_screen.dart';
+import 'package:my_shop/google_button.dart';
+import 'package:my_shop/screens/admin/admin_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,19 +20,61 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     setState(() => _isLoading = true);
+
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      Navigator.pushReplacementNamed(context, '/root');
+
+      final user = userCredential.user;
+
+      if (user == null) return;
+
+      // Email verification check
+      if (!user.emailVerified) {
+        await FirebaseAuth.instance.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please verify your email before logging in'),
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // 🔥 Fetch user role from Firestore
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User data not found in Firestore')),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final role = doc.data()!['role'];
+
+      // 🔥 Route based on role
+      if (role == 'admin') {
+        Navigator.pushReplacementNamed(
+            context, AdminDashboard.routeName);
+      } else {
+        Navigator.pushReplacementNamed(context, '/root');
+      }
+
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Login error')),
       );
-    } finally {
-      setState(() => _isLoading = false);
     }
+
+    setState(() => _isLoading = false);
   }
 
   Future<void> _forgotPassword() async {
@@ -62,9 +107,8 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error continuing as guest: $e')),
       );
-    } finally {
-      setState(() => _isLoading = false);
     }
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -103,11 +147,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Text('Continue as Guest'),
                   ),
                   const SizedBox(height: 16),
+                  const GoogleButton(),
+                  const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
-                      Navigator.pushReplacementNamed(context, '/register');
+                      Navigator.pushReplacementNamed(
+                          context, RegisterScreen.routeName);
                     },
-                    child: const Text('Don\'t have an account? Sign Up'),
+                    child:
+                        const Text('Don\'t have an account? Sign Up'),
                   ),
                 ],
               ),

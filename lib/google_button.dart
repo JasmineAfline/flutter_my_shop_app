@@ -17,36 +17,18 @@ class GoogleButton extends StatelessWidget {
     try {
       UserCredential authResults;
 
-      // =======================
-      //  WEB SIGN-IN
-      // =======================
       if (kIsWeb) {
-        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-        googleProvider.addScope('email');
-        googleProvider.addScope('profile');
-        
-        authResults =
-            await FirebaseAuth.instance.signInWithPopup(googleProvider);
-      }
-      // =========================
-      //  MOBILE SIGN-IN (ANDROID/iOS)
-      // =========================
-      else {
-        // For mobile, we'll use a simpler approach
-        // Import google_sign_in dynamically only for mobile
-        try {
-          final GoogleAuthProvider googleProvider = GoogleAuthProvider();
-          authResults = await FirebaseAuth.instance.signInWithProvider(googleProvider);
-        } catch (e) {
-          throw Exception('Google Sign-In is not available on this platform. Error: $e');
-        }
+        final googleProvider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('profile');
+
+        authResults = await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      } else {
+        final googleProvider = GoogleAuthProvider();
+        authResults = await FirebaseAuth.instance.signInWithProvider(googleProvider);
       }
 
-      // =======================
-      // CREATE USER IF NEW
-      // =======================
-      final isNewUser =
-          authResults.additionalUserInfo?.isNewUser ?? false;
+      final isNewUser = authResults.additionalUserInfo?.isNewUser ?? false;
 
       if (isNewUser) {
         final user = authResults.user!;
@@ -67,42 +49,18 @@ class GoogleButton extends StatelessWidget {
             .set(newUser.toMap());
       }
 
-      // =======================
-      //  REFRESH PROVIDER
-      // =======================
-      final userProvider =
-          Provider.of<UserProvider>(context, listen: false);
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.fetchUser();
 
-      // =======================
-      //  NAVIGATE BASED ON ROLE
-      // =======================
       if (context.mounted) {
         if (userProvider.isAdmin) {
-          Navigator.pushReplacementNamed(
-            context,
-            AdminDashboard.routeName,
-          );
+          Navigator.pushReplacementNamed(context, AdminDashboard.routeName);
         } else {
-          Navigator.pushReplacementNamed(
-            context,
-            RootScreen.routeName,
-          );
+          Navigator.pushReplacementNamed(context, RootScreen.routeName);
         }
       }
     } on FirebaseAuthException catch (error) {
-      // Handle popup closed by user
-      if (error.code == 'popup-closed-by-user') {
-        return;
-      }
-      
-      if (!context.mounted) return;
-      await MyAppFunctions.showErrorOrWarningDialog(
-        context: context,
-        subtitle: error.message ?? error.code,
-        fct: () {},
-      );
-    } on FirebaseException catch (error) {
+      if (error.code == 'popup-closed-by-user') return;
       if (!context.mounted) return;
       await MyAppFunctions.showErrorOrWarningDialog(
         context: context,
@@ -140,9 +98,7 @@ class GoogleButton extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        onPressed: () async {
-          await _googleSignIn(context: context);
-        },
+        onPressed: () async => await _googleSignIn(context: context),
       ),
     );
   }

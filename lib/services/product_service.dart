@@ -8,7 +8,17 @@ class ProductService {
 
   // 🔹 ADD PRODUCT
   Future<void> addProduct(Product product) async {
-    await _firestore.collection(_collection).add(product.toMap());
+    try {
+      await _firestore.collection(_collection).add({
+        ...product.toMap(),
+        'createdAt': Timestamp.now(),
+      });
+
+      print("✅ PRODUCT ADDED SUCCESSFULLY");
+    } catch (e) {
+      print("❌ ERROR ADDING PRODUCT: $e");
+      rethrow;
+    }
   }
 
   // 🔹 GET PRODUCTS STREAM
@@ -22,14 +32,24 @@ class ProductService {
 
   // 🔹 UPDATE PRODUCT
   Future<void> updateProduct(Product product) async {
-    await _firestore
-        .collection(_collection)
-        .doc(product.id)
-        .update(product.toMap());
+    try {
+      await _firestore
+          .collection(_collection)
+          .doc(product.id)
+          .update(product.toMap());
+    } catch (e) {
+      print("❌ ERROR UPDATING PRODUCT: $e");
+      rethrow;
+    }
   }
 
   // 🔹 DELETE PRODUCT
   Future<void> deleteProduct(String id) async {
-    await _firestore.collection(_collection).doc(id).delete();
+    try {
+      await _firestore.collection(_collection).doc(id).delete();
+    } catch (e) {
+      print("❌ ERROR DELETING PRODUCT: $e");
+      rethrow;
+    }
   }
 }
