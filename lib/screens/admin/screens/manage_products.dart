@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:my_shop/providers/user_provider.dart';
 import 'edit_product_screen.dart';
 
 class ManageProducts extends StatefulWidget {
@@ -17,6 +19,8 @@ class _ManageProductsState extends State<ManageProducts> {
   String _categoryFilter = 'All';
   bool _selectionMode = false;
   final Set<String> _selectedIds = {};
+  int _pageSize = 10;
+  int _currentPage = 0;
 
   @override
   void dispose() {
@@ -26,6 +30,24 @@ class _ManageProductsState extends State<ManageProducts> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    if (!userProvider.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Admin')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.lock_outline, size: 72, color: Colors.grey),
+              const SizedBox(height: 12),
+              const Text('Unauthorized', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('You do not have permission to view this page.'),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manage Products'),
@@ -126,6 +148,12 @@ class _ManageProductsState extends State<ManageProducts> {
             });
           }
 
+          // Pagination calculations
+          final totalItems = list.length;
+          final totalPages = (totalItems / _pageSize).ceil().clamp(1, 9999);
+          final start = _currentPage * _pageSize;
+          final paged = list.skip(start).take(_pageSize).toList();
+
           return Column(
             children: [
               Padding(
@@ -175,14 +203,15 @@ class _ManageProductsState extends State<ManageProducts> {
               Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: list.length,
+                        itemCount: paged.length,
                         itemBuilder: (context, index) {
-                          final d = list[index];
+                          final d = paged[index];
                           final product = d.data() as Map<String, dynamic>;
                           final productId = d.id;
                           final imageUrl = (product['imageUrl'] ?? '').toString();
                           final name = (product['title'] ?? product['name'] ?? 'Unnamed Product').toString();
                           final price = _parsePrice(product);
+                          final active = (product['active'] ?? true) == true;
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -219,7 +248,7 @@ class _ManageProductsState extends State<ManageProducts> {
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               subtitle: Text(
-                                '\$${price.toStringAsFixed(2)}',
+                                'KSH ${price.toStringAsFixed(2)}',
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
                                   fontWeight: FontWeight.w600,
@@ -238,50 +267,90 @@ class _ManageProductsState extends State<ManageProducts> {
                                         });
                                       },
                                     )
-                                  : PopupMenuButton(
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                          value: 'edit',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit, size: 20),
-                                              SizedBox(width: 8),
-                                              Text('Edit'),
-                                            ],
+                                  : SizedBox(
+                                      width: 160,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Switch(
+                                            value: active,
+                                            onChanged: (val) => _toggleProductActive(productId, val),
                                           ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.delete, size: 20, color: Colors.red),
-                                              SizedBox(width: 8),
-                                              Text('Delete', style: TextStyle(color: Colors.red)),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                      onSelected: (value) {
-                                        if (value == 'delete') {
-                                          _deleteProduct(productId);
-                                        } else if (value == 'edit') {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => EditProductScreen(
-                                                productId: productId,
-                                                existingData: product,
+                                          PopupMenuButton(
+                                            itemBuilder: (context) => [
+                                              const PopupMenuItem(
+                                                value: 'edit',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.edit, size: 20),
+                                                    SizedBox(width: 8),
+                                                    Text('Edit'),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        }
-                                      },
+                                              const PopupMenuItem(
+                                                value: 'delete',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.delete, size: 20, color: Colors.red),
+                                                    SizedBox(width: 8),
+                                                    Text('Delete', style: TextStyle(color: Colors.red)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                            onSelected: (value) {
+                                              if (value == 'delete') {
+                                                _deleteProduct(productId);
+                                              } else if (value == 'edit') {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => EditProductScreen(
+                                                      productId: productId,
+                                                      existingData: product,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
                                     ),
                             ),
                           );
                         },
                       ),
                     ),
+              // Pagination controls
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Text('Showing ${start + 1}-${(start + paged.length)} of ${totalItems}'),
+                    const Spacer(),
+                    DropdownButton<int>(
+                      value: _pageSize,
+                      items: const [5, 10, 20, 50].map((v) => DropdownMenuItem(value: v, child: Text('$v'))).toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          _pageSize = v ?? 10;
+                          _currentPage = 0;
+                        });
+                      },
+                    ),
+                    IconButton(
+                      onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                      icon: const Icon(Icons.chevron_left),
+                    ),
+                    IconButton(
+                      onPressed: (_currentPage + 1) < totalPages ? () => setState(() => _currentPage++) : null,
+                      icon: const Icon(Icons.chevron_right),
+                    ),
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -309,6 +378,18 @@ class _ManageProductsState extends State<ManageProducts> {
     if (confirm == true) {
       try {
         await FirebaseFirestore.instance.collection('products').doc(productId).delete();
+        // log admin action
+        try {
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          if (userProvider.isAdmin) {
+            await FirebaseFirestore.instance.collection('admin_logs').add({
+              'action': 'delete_product',
+              'productId': productId,
+              'adminId': userProvider.getUser?.uid,
+              'timestamp': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (_) {}
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product deleted successfully')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting product: $e')));
@@ -352,13 +433,46 @@ class _ManageProductsState extends State<ManageProducts> {
         batch.delete(ref);
       }
       await batch.commit();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selected products deleted')));
-      setState(() {
-        _selectedIds.clear();
-        _selectionMode = false;
-      });
+      // log admin action
+      try {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        if (userProvider.isAdmin) {
+          await FirebaseFirestore.instance.collection('admin_logs').add({
+            'action': 'bulk_delete_products',
+            'productIds': _selectedIds.toList(),
+            'adminId': userProvider.getUser?.uid,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_) {}
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selected products deleted')));
+        setState(() {
+          _selectedIds.clear();
+          _selectionMode = false;
+        });
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error deleting: $e')));
+    }
+  }
+
+  Future<void> _toggleProductActive(String productId, bool active) async {
+    try {
+      await FirebaseFirestore.instance.collection('products').doc(productId).update({'active': active});
+      try {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        if (userProvider.isAdmin) {
+          await FirebaseFirestore.instance.collection('admin_logs').add({
+            'action': active ? 'enable_product' : 'disable_product',
+            'productId': productId,
+            'adminId': userProvider.getUser?.uid,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error updating product: $e')));
     }
   }
 }

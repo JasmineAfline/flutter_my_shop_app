@@ -16,6 +16,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
   Future<void> _login() async {
@@ -28,6 +29,8 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
       );
 
+      if (!mounted) return;
+
       final user = userCredential.user;
 
       if (user == null) return;
@@ -35,6 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Email verification check
       if (!user.emailVerified) {
         await FirebaseAuth.instance.signOut();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please verify your email before logging in'),
@@ -49,6 +53,8 @@ class _LoginScreenState extends State<LoginScreen> {
           .collection('users')
           .doc(user.uid)
           .get();
+
+      if (!mounted) return;
 
       if (!doc.exists) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -69,16 +75,18 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Login error')),
       );
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _forgotPassword() async {
     if (_emailController.text.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter your email to reset password')),
       );
@@ -88,10 +96,12 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
       );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password reset email sent')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -102,63 +112,96 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await FirebaseAuth.instance.signInAnonymously();
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/root');
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error continuing as guest: $e')),
       );
     }
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  TextField(
-                    controller: _emailController,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _login,
-                    child: const Text('Login'),
-                  ),
-                  TextButton(
-                    onPressed: _forgotPassword,
-                    child: const Text('Forgot Password?'),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _continueAsGuest,
-                    child: const Text('Continue as Guest'),
-                  ),
-                  const SizedBox(height: 16),
-                  const GoogleButton(),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushReplacementNamed(
-                          context, RegisterScreen.routeName);
-                    },
-                    child:
-                        const Text('Don\'t have an account? Sign Up'),
-                  ),
-                ],
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Card(
+              elevation: 6,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: _isLoading
+                    ? const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()))
+                    : Form(
+                        key: _formKey,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const FlutterLogo(size: 72),
+                            const SizedBox(height: 12),
+                            Text('Welcome back', style: Theme.of(context).textTheme.titleLarge),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: const InputDecoration(labelText: 'Email'),
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) => (v == null || v.isEmpty) ? 'Enter your email' : null,
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _passwordController,
+                              decoration: const InputDecoration(labelText: 'Password'),
+                              obscureText: true,
+                              validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (_formKey.currentState?.validate() ?? false) _login();
+                                },
+                                child: const Text('Login'),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _forgotPassword,
+                                child: const Text('Forgot Password?'),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed: _continueAsGuest,
+                                child: const Text('Continue as Guest'),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const GoogleButton(),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushReplacementNamed(context, RegisterScreen.routeName);
+                              },
+                              child: const Text('Don\'t have an account? Sign Up'),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
+            ),
+          ),
+        ),
       ),
     );
   }

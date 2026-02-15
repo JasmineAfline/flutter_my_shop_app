@@ -69,6 +69,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final user = userProvider.getUser;
     final themeProvider = Provider.of<ThemeProvider>(context);
 
+    if (!userProvider.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Admin Dashboard')),
+        body: const Center(child: Text('Unauthorized')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
@@ -131,7 +138,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       StatCard(
                         title: 'Revenue',
-                        value: '\$${_totalRevenue.toStringAsFixed(2)}',
+                        value: 'KSH ${_totalRevenue.toStringAsFixed(2)}',
                         icon: Icons.attach_money,
                         color: Colors.purple,
                       ),
@@ -170,6 +177,55 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     color: Colors.green,
                     onTap: () =>
                         Navigator.pushNamed(context, '/manageUsers'),
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Reports', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Text('Total Orders: $_totalOrders'),
+                          Text('Total Revenue: KSH ${_totalRevenue.toStringAsFixed(2)}'),
+                          const SizedBox(height: 8),
+                          FutureBuilder<QuerySnapshot>(
+                            future: FirebaseFirestore.instance.collection('orders').orderBy('createdAt', descending: true).limit(100).get(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) return const SizedBox.shrink();
+                              final docs = snapshot.data!.docs;
+                              // top products best-effort
+                              final Map<String, int> counts = {};
+                              for (var d in docs) {
+                                final data = d.data() as Map<String, dynamic>;
+                                final items = data['items'] as List<dynamic>?;
+                                if (items != null) {
+                                  for (var it in items) {
+                                    try {
+                                      final pid = it['productId']?.toString() ?? '';
+                                      final qty = (it['quantity'] ?? 1) as int;
+                                      if (pid.isNotEmpty) counts[pid] = (counts[pid] ?? 0) + qty;
+                                    } catch (_) {}
+                                  }
+                                }
+                              }
+                              final top = counts.entries.toList()..sort((a,b)=>b.value.compareTo(a.value));
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 8),
+                                  const Text('Top Products (approx)'),
+                                  const SizedBox(height: 6),
+                                  if (top.isEmpty) const Text('No product data'),
+                                  for (var e in top.take(5)) Text('${e.key} — ${e.value} sold'),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

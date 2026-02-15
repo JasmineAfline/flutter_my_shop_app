@@ -1,0 +1,3 @@
+
+[1m[31mError:[39m[22m Request to https://serviceusage.googleapis.com/v1/projects/my-shop-e305a/services/secretmanager.googleapis.com:enable had HTTP Error: 400, Billing account for project '718502726238' is not open. Billing must be enabled for activation of service(s) 'secretmanager.googleapis.com' to proceed.
+Help Token: AerXPhUd2OQvBcwdxCP78ccS8QSBwRo0dBeUWcXCtj6EfFj34-Xh19JsC4teAbuzIILe2ghXNK1hZhqRSup4Eb3G7jlgoGxWJaRtUufzB0YEoZkT

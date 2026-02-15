@@ -49,6 +49,8 @@ class GoogleButton extends StatelessWidget {
             .set(newUser.toMap());
       }
 
+      if (!context.mounted) return;
+
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       await userProvider.fetchUser();
 

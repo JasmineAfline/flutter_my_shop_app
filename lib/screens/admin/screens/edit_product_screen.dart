@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:my_shop/providers/user_provider.dart';
 
 class EditProductScreen extends StatefulWidget {
   final String? productId;
@@ -18,6 +20,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
   late TextEditingController _imageUrlController;
   late TextEditingController _categoryController;
   bool _isLoading = false;
+  bool _imageValid = true;
+  static const String _fallbackImage = 'https://via.placeholder.com/800x600.png?text=No+Image';
 
   @override
   void initState() {
@@ -31,6 +35,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
     // Update preview whenever the image URL changes
     _imageUrlController.addListener(() {
+      _validateImageUrl(_imageUrlController.text.trim());
       setState(() {}); // Rebuild to update image preview
     });
   }
@@ -46,12 +51,35 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
+    // Check image validity (best-effort)
+    final imageUrl = _imageUrlController.text.trim();
+    if (imageUrl.isNotEmpty) {
+      final ok = await _checkImageExists(imageUrl);
+      if (!ok) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('Image not reachable'),
+            content: const Text('The provided image URL could not be loaded. Use fallback image instead?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Edit URL')),
+              TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Use Fallback')),
+            ],
+          ),
+        );
+
+        if (confirmed == true) {
+          _imageUrlController.text = _fallbackImage;
+        } else {
+          return; // let user fix URL
+        }
+      }
+    }
 
     setState(() => _isLoading = true);
 
     final name = _nameController.text.trim();
     final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-    final imageUrl = _imageUrlController.text.trim();
     final category = _categoryController.text.trim();
 
     try {
@@ -83,6 +111,18 @@ class _EditProductScreenState extends State<EditProductScreen> {
                 : 'Product added successfully'),
           ),
         );
+        // Log admin action if possible
+        try {
+          final userProvider = Provider.of<UserProvider>(context, listen: false);
+          if (userProvider.isAdmin) {
+            await FirebaseFirestore.instance.collection('admin_logs').add({
+              'action': widget.productId != null ? 'update_product' : 'create_product',
+              'productId': widget.productId ?? 'new',
+              'adminId': userProvider.getUser?.uid,
+              'timestamp': FieldValue.serverTimestamp(),
+            });
+          }
+        } catch (_) {}
         Navigator.pop(context);
       }
     } catch (e) {
@@ -96,8 +136,38 @@ class _EditProductScreenState extends State<EditProductScreen> {
     }
   }
 
+  bool _validateImageUrl(String url) {
+    try {
+      final uri = Uri.tryParse(url);
+      if (uri == null) return false;
+      return uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _checkImageExists(String url) async {
+    if (!_validateImageUrl(url)) return false;
+    try {
+      final image = NetworkImage(url);
+      await precacheImage(image, context).timeout(const Duration(seconds: 5));
+      if (mounted) setState(() => _imageValid = true);
+      return true;
+    } catch (_) {
+      if (mounted) setState(() => _imageValid = false);
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    if (!userProvider.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Unauthorized')),
+        body: const Center(child: Text('You do not have permission to edit products')),
+      );
+    }
     final isEditing = widget.productId != null;
     final imageUrl = _imageUrlController.text.trim();
 
@@ -113,7 +183,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
             child: Column(
               children: [
                 // Live image preview
-                if (imageUrl.isNotEmpty)
+                if (imageUrl.isNotEmpty || !_imageValid)
                   Container(
                     width: double.infinity,
                     height: 200,
@@ -125,7 +195,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.network(
-                        imageUrl,
+                        imageUrl.isNotEmpty && _imageValid ? imageUrl : _fallbackImage,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Center(
                           child: Icon(
@@ -167,8 +237,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
                   controller: _imageUrlController,
                   decoration: const InputDecoration(labelText: 'Image URL (optional)'),
                   validator: (value) {
-                    // optional
-                    return null;
+                    if (value == null || value.trim().isEmpty) return null;
+                    return _validateImageUrl(value.trim()) ? null : 'Enter a valid image URL';
                   },
                 ),
                 const SizedBox(height: 16),

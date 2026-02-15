@@ -258,6 +258,88 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _changePassword() async {
+    final oldPwController = TextEditingController();
+    final newPwController = TextEditingController();
+    final confirmPwController = TextEditingController();
+    
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Change Password'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: oldPwController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Current Password'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newPwController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'New Password'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmPwController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Confirm Password'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(c, true), child: const Text('Change')),
+        ],
+      ),
+    );
+
+    if (result != true) return;
+
+    if (newPwController.text != confirmPwController.text) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Passwords do not match')),
+        );
+      }
+      return;
+    }
+
+    try {
+      setState(() => _isLoading = true);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user?.email == null) throw Exception('User email not found');
+      
+      // Re-authenticate
+      final credential = EmailAuthProvider.credential(
+        email: user!.email!,
+        password: oldPwController.text,
+      );
+      await user.reauthenticateWithCredential(credential);
+      
+      // Update password
+      await user.updatePassword(newPwController.text);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password changed successfully'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
@@ -425,36 +507,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       const SizedBox(height: 24),
 
-                      // Account Info Card
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Account Information',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildInfoRow(
-                                'Role',
-                                user.role.toUpperCase(),
-                                Icons.admin_panel_settings,
-                              ),
-                              const Divider(),
-                              _buildInfoRow(
-                                'Member Since',
-                                _formatDate(user.createdAt),
-                                Icons.calendar_today,
-                              ),
-                            ],
-                          ),
+                      // Change Password Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: _changePassword,
+                          child: const Text('Change Password'),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
 
                       // Logout Button
                       OutlinedButton.icon(

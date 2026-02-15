@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:my_shop/providers/user_provider.dart';
 
 class ManageOrders extends StatefulWidget {
   static const routeName = '/ManageOrders';
@@ -10,11 +12,32 @@ class ManageOrders extends StatefulWidget {
 }
 
 class _ManageOrdersState extends State<ManageOrders> {
+  String _statusFilter = 'All';
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    if (!userProvider.isAdmin) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Manage Orders')),
+        body: Center(child: Text('Unauthorized')), 
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manage Orders'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.filter_list),
+            onSelected: (v) => setState(() => _statusFilter = v),
+            itemBuilder: (c) => const [
+              PopupMenuItem(value: 'All', child: Text('All')),
+              PopupMenuItem(value: 'pending', child: Text('Pending')),
+              PopupMenuItem(value: 'processing', child: Text('Processing')),
+              PopupMenuItem(value: 'completed', child: Text('Completed')),
+              PopupMenuItem(value: 'cancelled', child: Text('Cancelled')),
+            ],
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
@@ -56,12 +79,38 @@ class _ManageOrdersState extends State<ManageOrders> {
 
           final orders = snapshot.data!.docs;
 
+          final filtered = _statusFilter == 'All'
+              ? orders
+              : orders.where((d) => ((d.data() as Map<String, dynamic>)['status'] ?? 'pending') == _statusFilter).toList();
+
+          if (filtered.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 80,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No orders',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return ListView.builder(
             padding: const EdgeInsets.all(16),
-            itemCount: orders.length,
+            itemCount: filtered.length,
             itemBuilder: (context, index) {
-              final order = orders[index].data() as Map<String, dynamic>;
-              final orderId = orders[index].id;
+              final order = filtered[index].data() as Map<String, dynamic>;
+              final orderId = filtered[index].id;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -75,7 +124,7 @@ class _ManageOrdersState extends State<ManageOrders> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
-                    'Total: \$${order['total']?.toStringAsFixed(2) ?? '0.00'}',
+                    'Total: KSH ${order['total']?.toStringAsFixed(2) ?? '0.00'}',
                   ),
                   trailing: Chip(
                     label: Text(
@@ -98,6 +147,9 @@ class _ManageOrdersState extends State<ManageOrders> {
                           Text('Email: ${order['customerEmail'] ?? 'N/A'}'),
                           const SizedBox(height: 4),
                           Text('Address: ${order['address'] ?? 'N/A'}'),
+                          const SizedBox(height: 8),
+                          if ((order['paymentRef'] ?? '').toString().isNotEmpty)
+                            Text('Payment Ref: ${order['paymentRef']}'),
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -107,6 +159,11 @@ class _ManageOrdersState extends State<ManageOrders> {
                                   _updateOrderStatus(orderId, 'processing');
                                 },
                                 child: const Text('Mark Processing'),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () => _cancelOrder(orderId),
+                                child: const Text('Cancel Order', style: TextStyle(color: Colors.red)),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
@@ -149,7 +206,20 @@ class _ManageOrdersState extends State<ManageOrders> {
           .collection('orders')
           .doc(orderId)
           .update({'status': status});
-      
+      // log admin action
+      try {
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        if (userProvider.isAdmin) {
+          await FirebaseFirestore.instance.collection('admin_logs').add({
+            'action': 'update_order_status',
+            'orderId': orderId,
+            'status': status,
+            'adminId': userProvider.getUser?.uid,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_) {}
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Order status updated to $status')),
@@ -162,5 +232,23 @@ class _ManageOrdersState extends State<ManageOrders> {
         );
       }
     }
+  }
+
+  Future<void> _cancelOrder(String orderId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Cancel Order'),
+        content: const Text('Are you sure you want to cancel this order?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('No')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Yes', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await _updateOrderStatus(orderId, 'cancelled');
   }
 }

@@ -7,12 +7,14 @@ import 'package:my_shop/constants/theme_data.dart';
 import 'package:my_shop/firebase_options.dart';
 import 'package:my_shop/providers/theme_provider.dart';
 import 'package:my_shop/providers/user_provider.dart';
+import 'package:my_shop/providers/cart_provider.dart';
 
 import 'package:my_shop/screens/auth/login_screen.dart';
 import 'package:my_shop/screens/register_screen.dart';
 import 'package:my_shop/screens/auth/forgot_password_screen.dart';
 import 'package:my_shop/screens/home_screen.dart';
 import 'package:my_shop/screens/profile_screen.dart';
+import 'package:my_shop/screens/checkout_screen.dart';
 import 'package:my_shop/screens/admin/admin_dashboard.dart';
 import 'package:my_shop/screens/admin/screens/add_product_screen.dart';
 import 'package:my_shop/screens/admin/screens/manage_products.dart';
@@ -31,10 +33,12 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
       ],
       child: const MyApp(),
     ),
   );
+
 }
 
 class MyApp extends StatelessWidget {
@@ -47,6 +51,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'My Shop',
+      // Global scroll behavior for modern feel
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        physics: const BouncingScrollPhysics(),
+      ),
       theme: Styles.themeData(
         isDarkTheme: themeProvider.isDarkTheme,
         context: context,
@@ -60,7 +68,15 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/root': (context) => const RootScreen(),
-        '/admin': (context) => const AdminDashboard(),
+        CheckoutScreen.routeName: (context) => const CheckoutScreen(cartItems: [], total: 0),
+        '/admin': (context) {
+          final userProvider = Provider.of<UserProvider>(context);
+          if (userProvider.isAdmin) return const AdminDashboard();
+          return Scaffold(
+            appBar: AppBar(title: const Text('Unauthorized')),
+            body: const Center(child: Text('You are not authorized to view this page')),
+          );
+        },
         '/addProduct': (context) => const AddProductScreen(),
         '/manageProducts': (context) => const ManageProducts(),
         '/manageOrders': (context) => const ManageOrders(),
