@@ -1,108 +1,125 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const base64 = require('base-64');
 require('dotenv').config();
 
 const app = express();
 
-// Enable CORS for all routes (allows Flutter web app to call this server)
-app.use(cors());
+// Configure CORS properly for all origins
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Accept'],
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
-// M-Pesa Configuration
-const CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY || '';
-const CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET || '';
-const SHORTCODE = process.env.MPESA_SHORTCODE || '';
-const PASSKEY = process.env.MPESA_PASSKEY || '';
-const CALLBACK_URL = process.env.CALLBACK_URL || 'http://localhost:3001/mpesa/callback';
-
-// Generate OAuth token for M-Pesa API
+/* ==============================
+   1️⃣ Generate Access Token
+================================ */
 async function getAccessToken() {
-  if (!CONSUMER_KEY || !CONSUMER_SECRET) {
-    throw new Error('M-Pesa credentials not configured in .env');
-  }
+    const consumerKey = process.env.MPESA_CONSUMER_KEY.trim();
+    const consumerSecret = process.env.MPESA_CONSUMER_SECRET.trim();
 
-  const auth = base64.encode(`${CONSUMER_KEY}:${CONSUMER_SECRET}`);
-  try {
-    const response = await axios.get(
-      'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
-      {
-        headers: { Authorization: `Basic ${auth}` },
-      }
-    );
-    return response.data.access_token;
-  } catch (error) {
-    console.error('Error getting M-Pesa token:', error.response?.data || error.message);
-    throw error;
-  }
+    const auth = Buffer
+        .from(`${consumerKey}:${consumerSecret}`)
+        .toString('base64');
+
+    try {
+        const response = await axios.get(
+            'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+            {
+                headers: {
+                    Authorization: `Basic ${auth}`
+                }
+            }
+        );
+
+        return response.data.access_token;
+
+    } catch (error) {
+        console.error("❌ Token Error:", error.response?.data || error.message);
+        throw error;
+    }
 }
 
-// STK Push endpoint
+/* ==============================
+   2️⃣ STK Push Route
+================================ */
 app.post('/stkpush', async (req, res) => {
-  const { phone, amount } = req.body;
 
-  if (!phone || !amount) {
-    return res.status(400).json({ error: 'phone and amount are required' });
-  }
+    console.log("📥 Payment request:", req.body);
 
-  try {
-    const token = await getAccessToken();
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[^0-9]/g, '')
-      .slice(0, 14);
+    const { phone, amount } = req.body;
 
-    const password = base64.encode(SHORTCODE + PASSKEY + timestamp);
+    if (!phone || !amount) {
+        return res.status(400).json({ error: "Phone and amount required" });
+    }
 
-    const stkRequest = {
-      BusinessShortCode: SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: 'CustomerPayBillOnline',
-      Amount: amount,
-      PartyA: phone,
-      PartyB: SHORTCODE,
-      PhoneNumber: phone,
-      CallBackURL: CALLBACK_URL,
-      AccountReference: 'MyShop',
-      TransactionDesc: 'Payment for goods',
-    };
+    try {
+        const token = await getAccessToken();
 
-    console.log('Sending STK Push request:', stkRequest);
+        const timestamp = new Date()
+            .toISOString()
+            .replace(/[-:.TZ]/g, '')
+            .slice(0, 14);
 
-    const response = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
-      stkRequest,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+        const shortcode = process.env.MPESA_SHORTCODE;
+        const passkey = process.env.MPESA_PASSKEY;
 
-    console.log('STK Push response:', response.data);
-    res.status(200).json(response.data);
-  } catch (error) {
-    console.error('STK Push Error:', error.response?.data || error.message);
-    res.status(500).json({ 
-      error: 'STK Push failed',
-      details: error.response?.data || error.message
-    });
-  }
+        const password = Buffer
+            .from(shortcode + passkey + timestamp)
+            .toString('base64');
+
+        const response = await axios.post(
+            'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+            {
+                BusinessShortCode: shortcode,
+                Password: password,
+                Timestamp: timestamp,
+                TransactionType: "CustomerPayBillOnline",
+                Amount: Number(amount),
+                PartyA: phone,
+                PartyB: shortcode,
+                PhoneNumber: phone,
+                CallBackURL: process.env.CALLBACK_URL,
+                AccountReference: "MyShop",
+                TransactionDesc: "Payment"
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        console.log("🟢 STK Response:", response.data);
+
+        res.status(200).json(response.data);
+
+    } catch (error) {
+        console.error("🔴 STK Error:", error.response?.data || error.message);
+        res.status(500).json(error.response?.data || { error: "STK failed" });
+    }
 });
 
-// M-Pesa Callback endpoint
+/* ==============================
+   3️⃣ Callback
+================================ */
 app.post('/callback', (req, res) => {
-  console.log('M-Pesa Callback Received:', req.body);
-  // TODO: Save payment confirmation to your database (Firestore)
-  res.status(200).json({ success: true });
+
+    console.log("📩 Callback Received:");
+    console.log(JSON.stringify(req.body, null, 2));
+
+    res.status(200).send("OK");
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'M-Pesa server is running' });
-});
-
+/* ==============================
+   4️⃣ Start Server
+================================ */
 const PORT = process.env.PORT || 3001;
+
 app.listen(PORT, () => {
-  console.log(`M-Pesa server running on port ${PORT}`);
-  console.log(`STK Push endpoint: http://localhost:${PORT}/stkpush`);
-  console.log(`Callback URL: ${CALLBACK_URL}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });

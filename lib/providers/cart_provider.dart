@@ -1,66 +1,73 @@
 import 'package:flutter/material.dart';
+import 'package:my_shop/models/cart_model.dart';
+import 'package:my_shop/models/product_model.dart';
 
-class CartProvider extends ChangeNotifier {
-  final List<Map<String, dynamic>> _cartItems = [];
+// RECOMMENDED UPGRADE
+class CartProvider with ChangeNotifier {
+  // Use a Map of the Model for faster lookups by ID
+  Map<String, CartItem> _cartItems = {};
 
-  List<Map<String, dynamic>> get cartItems => _cartItems;
+  Map<String, CartItem> get cartItems => _cartItems;
 
-  double get total => _cartItems.fold<double>(
-    0,
-    (sum, item) => sum + ((item['price'] as num) * (item['quantity'] as int)),
-  );
+  int get itemCount => _cartItems.length;
 
-  void addToCart({
-    required String productId,
-    required String name,
-    required double price,
-    required String imageUrl,
-  }) {
-    // Check if item already exists in cart
-    final existingIndex = _cartItems.indexWhere((item) => item['productId'] == productId);
+  double get total => _cartItems.values.fold(0, (sum, item) => sum + (item.price * item.quantity));
 
-    if (existingIndex >= 0) {
-      // Item exists, increase quantity
-      _cartItems[existingIndex]['quantity']++;
+  // Alias for total to match code expectations
+  double get totalAmount => total;
+
+  // Get cart items as a list of maps for checkout
+  List<Map<String, dynamic>> get cartItemsList => _cartItems.values.map((item) => item.toMap()).toList();
+
+  void addToCart(Product product) {
+    if (_cartItems.containsKey(product.id)) {
+      _cartItems.update(product.id, (old) => CartItem(
+        productId: old.productId, 
+        title: old.title, 
+        quantity: old.quantity + 1, 
+        price: old.price, 
+        imageUrl: old.imageUrl
+      ));
     } else {
-      // New item, add to cart
-      _cartItems.add({
-        'productId': productId,
-        'name': name,
-        'price': price,
-        'imageUrl': imageUrl,
-        'quantity': 1,
-      });
+      _cartItems.putIfAbsent(product.id, () => CartItem(
+        productId: product.id, 
+        title: product.title, 
+        quantity: 1, 
+        price: product.price, 
+        imageUrl: product.imageUrl
+      ));
     }
     notifyListeners();
   }
 
-  void removeFromCart(int index) {
-    if (index >= 0 && index < _cartItems.length) {
-      _cartItems.removeAt(index);
+  void removeItem(String productId) {
+    _cartItems.remove(productId);
+    notifyListeners();
+  }
+
+  void updateQuantity(String productId, int quantity) {
+    if (_cartItems.containsKey(productId)) {
+      if (quantity <= 0) {
+        _cartItems.remove(productId);
+      } else {
+        _cartItems.update(productId, (old) => CartItem(
+          productId: old.productId,
+          title: old.title,
+          quantity: quantity,
+          price: old.price,
+          imageUrl: old.imageUrl,
+        ));
+      }
       notifyListeners();
     }
   }
 
-  void updateQuantity(int index, int quantity) {
-    if (index >= 0 && index < _cartItems.length) {
-      if (quantity <= 0) {
-        removeFromCart(index);
-      } else {
-        _cartItems[index]['quantity'] = quantity;
-        notifyListeners();
-      }
-    }
+  void removeFromCart(String productId) {
+    removeItem(productId);
   }
 
   void clearCart() {
     _cartItems.clear();
     notifyListeners();
   }
-
-  int get itemCount => _cartItems.length;
-
-  bool isEmpty() => _cartItems.isEmpty;
-
-  bool isNotEmpty() => _cartItems.isNotEmpty;
 }

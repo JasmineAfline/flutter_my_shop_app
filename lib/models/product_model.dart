@@ -7,6 +7,7 @@ class Product {
   final String category;
   final int stock;
   final bool isOnSale;
+  final double? salePrice; // Added for sales
 
   Product({
     required this.id,
@@ -17,7 +18,11 @@ class Product {
     required this.category,
     required this.stock,
     required this.isOnSale,
+    this.salePrice,
   });
+
+  // Calculate actual price
+  double get currentPrice => isOnSale ? (salePrice ?? price) : price;
 
   factory Product.fromFirestore(Map<String, dynamic> data, String id) {
     return Product(
@@ -29,6 +34,7 @@ class Product {
       category: data['category'] ?? '',
       stock: data['stock'] ?? 0,
       isOnSale: data['isOnSale'] ?? false,
+      salePrice: data['salePrice']?.toDouble(),
     );
   }
 
@@ -41,6 +47,7 @@ class Product {
       'category': category,
       'stock': stock,
       'isOnSale': isOnSale,
+      'salePrice': salePrice,
     };
   }
 }

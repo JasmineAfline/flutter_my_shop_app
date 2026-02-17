@@ -4,16 +4,18 @@ class UserModel {
   final String uid;
   final String username;
   final String email;
+  final String phoneNumber; // Added for M-Pesa
   final String userImage;
   final Timestamp createdAt;
-  final List userCart;
-  final List userWish;
+  final List<dynamic> userCart; 
+  final List<dynamic> userWish;
   final String role;
 
   UserModel({
     required this.uid,
     required this.username,
     required this.email,
+    required this.phoneNumber,
     required this.userImage,
     required this.createdAt,
     required this.userCart,
@@ -26,11 +28,12 @@ class UserModel {
       uid: uid,
       username: doc['username'] ?? '',
       email: doc['email'] ?? '',
+      phoneNumber: doc['phoneNumber'] ?? '',
       role: doc['role'] ?? 'user',
       userImage: doc['userImage'] ?? '',
       createdAt: doc['createdAt'] ?? Timestamp.now(),
-      userCart: List.from(doc['userCart'] ?? []),
-      userWish: List.from(doc['userWish'] ?? []),
+      userCart: doc['userCart'] ?? [],
+      userWish: doc['userWish'] ?? [],
     );
   }
 
@@ -39,6 +42,7 @@ class UserModel {
       'uid': uid,
       'username': username,
       'email': email,
+      'phoneNumber': phoneNumber,
       'userImage': userImage,
       'createdAt': createdAt,
       'userCart': userCart,

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+
+// Ensure these paths match your project structure exactly
 import 'package:my_shop/providers/user_provider.dart';
+import 'package:my_shop/providers/theme_provider.dart';
 import 'package:my_shop/screens/admin/widgets/stat_card.dart';
 import 'package:my_shop/screens/admin/widgets/dashboard_tile.dart';
-import 'package:provider/provider.dart';
-import 'package:my_shop/providers/theme_provider.dart';
 
 class AdminDashboard extends StatefulWidget {
   static const routeName = '/admin';
@@ -30,10 +32,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _loadDashboardData() async {
     try {
+      // 1. Fetch Products Count
       final productsSnapshot =
           await FirebaseFirestore.instance.collection('products').get();
       _totalProducts = productsSnapshot.docs.length;
 
+      // 2. Fetch Orders and Calculate Revenue
       final ordersSnapshot =
           await FirebaseFirestore.instance.collection('orders').get();
       _totalOrders = ordersSnapshot.docs.length;
@@ -45,34 +49,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
       }
       _totalRevenue = revenue;
 
+      // 3. Fetch Users Count
       final usersSnapshot =
           await FirebaseFirestore.instance.collection('users').get();
       _totalUsers = usersSnapshot.docs.length;
 
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       debugPrint('Error loading dashboard data: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    userProvider.clearUser();
+    await FirebaseAuth.instance.signOut();
+    userProvider.clearUser(); // Resetting local provider state
     if (mounted) Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final user = userProvider.getUser;
     final themeProvider = Provider.of<ThemeProvider>(context);
 
+    // Safety Guard: Check if user is admin
     if (!userProvider.isAdmin) {
       return Scaffold(
         appBar: AppBar(title: const Text('Admin Dashboard')),
-        body: const Center(child: Text('Unauthorized')),
+        body: const Center(
+          child: Text('Unauthorized: Admin access only.', 
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        ),
       );
     }
 
@@ -106,16 +114,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Admin Profile Header
                   Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: ListTile(
-                      title: Text(user?.username ?? 'Admin'),
-                      subtitle: Text(user?.email ?? ''),
+                      leading: const CircleAvatar(child: Icon(Icons.admin_panel_settings)),
+                      title: Text(userProvider.username, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(userProvider.getUser?.email ?? 'No email associated'),
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // Stats Grid
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1.4,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
                       StatCard(
@@ -138,91 +155,101 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ),
                       StatCard(
                         title: 'Revenue',
-                        value: 'KSH ${_totalRevenue.toStringAsFixed(2)}',
-                        icon: Icons.attach_money,
+                        value: 'KSH ${_totalRevenue.toStringAsFixed(0)}',
+                        icon: Icons.payments,
                         color: Colors.purple,
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
 
+                  // Management Tiles
+                  const Text('Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
                   DashboardTile(
                     title: 'Add Product',
-                    subtitle: 'Add a new product',
-                    icon: Icons.add_box,
+                    subtitle: 'Create a new store item',
+                    icon: Icons.add_business,
                     color: Colors.teal,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/addProduct'),
+                    onTap: () => Navigator.pushNamed(context, '/addProduct'),
                   ),
                   DashboardTile(
                     title: 'Manage Products',
-                    subtitle: 'Edit products',
-                    icon: Icons.inventory_2,
+                    subtitle: 'Update prices or stock',
+                    icon: Icons.edit_note,
                     color: Colors.blue,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/manageProducts'),
+                    onTap: () => Navigator.pushNamed(context, '/manageProducts'),
                   ),
                   DashboardTile(
                     title: 'Manage Orders',
-                    subtitle: 'View orders',
-                    icon: Icons.shopping_bag,
+                    subtitle: 'View and process sales',
+                    icon: Icons.local_shipping,
                     color: Colors.orange,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/manageOrders'),
+                    onTap: () => Navigator.pushNamed(context, '/manageOrders'),
                   ),
                   DashboardTile(
                     title: 'Manage Users',
-                    subtitle: 'Manage users',
-                    icon: Icons.people,
+                    subtitle: 'Control user permissions',
+                    icon: Icons.manage_accounts,
                     color: Colors.green,
-                    onTap: () =>
-                        Navigator.pushNamed(context, '/manageUsers'),
+                    onTap: () => Navigator.pushNamed(context, '/manageUsers'),
                   ),
-                  const SizedBox(height: 16),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Theme Settings Card
                   Card(
+                    color: themeProvider.isDarkTheme ? Colors.grey[900] : Colors.grey[100],
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Reports', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text('Total Orders: $_totalOrders'),
-                          Text('Total Revenue: KSH ${_totalRevenue.toStringAsFixed(2)}'),
-                          const SizedBox(height: 8),
-                          FutureBuilder<QuerySnapshot>(
-                            future: FirebaseFirestore.instance.collection('orders').orderBy('createdAt', descending: true).limit(100).get(),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) return const SizedBox.shrink();
-                              final docs = snapshot.data!.docs;
-                              // top products best-effort
-                              final Map<String, int> counts = {};
-                              for (var d in docs) {
-                                final data = d.data() as Map<String, dynamic>;
-                                final items = data['items'] as List<dynamic>?;
-                                if (items != null) {
-                                  for (var it in items) {
-                                    try {
-                                      final pid = it['productId']?.toString() ?? '';
-                                      final qty = (it['quantity'] ?? 1) as int;
-                                      if (pid.isNotEmpty) counts[pid] = (counts[pid] ?? 0) + qty;
-                                    } catch (_) {}
-                                  }
-                                }
-                              }
-                              final top = counts.entries.toList()..sort((a,b)=>b.value.compareTo(a.value));
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 8),
-                                  const Text('Top Products (approx)'),
-                                  const SizedBox(height: 6),
-                                  if (top.isEmpty) const Text('No product data'),
-                                  for (var e in top.take(5)) Text('${e.key} — ${e.value} sold'),
-                                ],
-                              );
-                            },
+                          const Text('Theme Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Divider(),
+                          Text(
+                            'Set the default theme for all users. Users can override this in their profile.',
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                           ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              const Text('Global Theme: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                              const Spacer(),
+                              Switch(
+                                value: themeProvider.isDarkTheme,
+                                onChanged: (value) => themeProvider.setGlobalTheme(value),
+                                activeColor: Colors.green,
+                              ),
+                              Text(
+                                themeProvider.isDarkTheme ? 'Dark' : 'Light',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: themeProvider.isDarkTheme ? Colors.blue : Colors.orange,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Simple Report Card
+                  Card(
+                    color: themeProvider.isDarkTheme ? Colors.grey[900] : Colors.grey[100],
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Quick Insights', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Divider(),
+                          Text('Average Order Value: KSH ${(_totalOrders > 0 ? _totalRevenue / _totalOrders : 0).toStringAsFixed(2)}'),
+                          const SizedBox(height: 4),
+                          Text('Platform Growth: ${_totalUsers} Total Members'),
                         ],
                       ),
                     ),

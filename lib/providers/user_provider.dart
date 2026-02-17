@@ -1,89 +1,79 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:my_shop/models/user_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserProvider with ChangeNotifier {
-  UserModel? _user;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  UserModel? get getUser {
-    return _user;
-  }
+  User? _user;
+  bool _isAdmin = false;
+  String _displayName = 'Guest';
+  bool _isLoading = true;
 
-  bool get isLoggedIn {
-    return _user != null;
-  }
+  // --- GETTERS ---
+  User? get getUser => _user;
+  bool get isLoggedIn => _user != null;
+  bool get isAdmin => _isAdmin;
+  bool get isRegularUser => _user != null && !_isAdmin;
+  bool get isLoading => _isLoading;
+  String get username => _displayName;
+  String get email => _user?.email ?? 'No Email';
+  String get uid => _user?.uid ?? '';
 
-  String get role {
-    return _user?.role ?? 'guest';
-  }
-
-
-
-  Future<void> fetchUser() async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      _user = null;
-      notifyListeners();
-      return;
-    }
-
-    try {
-      final docSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-
-      if (docSnapshot.exists && docSnapshot.data() != null) {
-        _user = UserModel.fromDocument(
-          currentUser.uid,
-          docSnapshot.data() as Map<String, dynamic>,
-        );
+  UserProvider() {
+    // Listen to Auth State (Login/Logout)
+    _auth.authStateChanges().listen((User? user) async {
+      _user = user;
+      if (user != null) {
+        await _fetchUserData(user.uid);
       } else {
-        _user = UserModel(
-          uid: currentUser.uid,
-          username: currentUser.displayName ?? '',
-          email: currentUser.email ?? '',
-          role: 'user', userCart: [], userWish: [], userImage: '', createdAt: Timestamp.now(),
-        );
+        _displayName = 'Guest';
+        _isAdmin = false;
       }
+      _isLoading = false;
       notifyListeners();
+    });
+  }
+
+  // Fetch extra details from Firestore (Username and Role)
+  Future<void> _fetchUserData(String uid) async {
+    try {
+      DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        _displayName = data['username'] ?? data['name'] ?? _user?.email?.split('@')[0] ?? 'User';
+        
+        // Checks if 'role' is admin OR 'isAdmin' boolean is true
+        _isAdmin = (data['role'] == 'admin') || (data['isAdmin'] == true);
+      } else {
+        // Fallback if document doesn't exist yet
+        _displayName = _user?.email?.split('@')[0] ?? 'User';
+        _isAdmin = false;
+      }
     } catch (e) {
-      debugPrint("Error fetching user: $e");
-      rethrow;
+      debugPrint("Error fetching user data: $e");
     }
-  }
-
-
-  Future<String?> login(String email, String password) async {
-  try {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-    // fetch Firestore user after login
-    await fetchUser(); 
-    return null; 
-  } on FirebaseAuthException catch (e) {
-    return e.message ?? "Login failed";
-  } catch (e) {
-    return e.toString();
-  }
-}
-void setUser(UserModel user) {
-  _user = user;
-  notifyListeners();
-}
-
-
-  void clearUser() {
-    _user = null;
     notifyListeners();
   }
 
+  // Manual Refresh if needed
+  Future<void> refreshUser() async {
+    if (_user != null) {
+      await _fetchUserData(_user!.uid);
+    }
+  }
 
+  // Clear everything on Logout
+  void clearUser() {
+    _user = null;
+    _isAdmin = false;
+    _displayName = 'Guest';
+    notifyListeners();
+  }
 
-
-  bool get isAdmin => _user?.role == 'admin';
-  bool get isRegularUser => _user?.role == 'user';
+  Future<void> logout() async {
+    await _auth.signOut();
+    clearUser();
+  }
 }

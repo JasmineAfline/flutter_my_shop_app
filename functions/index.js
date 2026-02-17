@@ -3,24 +3,20 @@ const functions = require("firebase-functions");
 const axios = require("axios");
 const base64 = require("base-64");
 
-// Load M-Pesa credentials from Firebase config or environment variables (fallback)
-let consumerKey;
-let consumerSecret;
-let shortcode;
-let passkey;
-try {
-  const cfg = functions.config();
-  consumerKey = cfg?.mpesa?.consumer_key;
-  consumerSecret = cfg?.mpesa?.consumer_secret;
-  shortcode = cfg?.mpesa?.shortcode;
-  passkey = cfg?.mpesa?.passkey;
-} catch (e) {
-  // functions.config() may not be available in firebase-functions v7+. Use env vars.
-  consumerKey = process.env.MPESA_CONSUMER_KEY;
-  consumerSecret = process.env.MPESA_CONSUMER_SECRET;
-  shortcode = process.env.MPESA_SHORTCODE;
-  passkey = process.env.MPESA_PASSKEY;
-}
+// Load M-Pesa credentials from environment variables
+const consumerKey = process.env.MPESA_CONSUMER_KEY;
+const consumerSecret = process.env.MPESA_CONSUMER_SECRET;
+const shortcode = process.env.MPESA_SHORTCODE;
+const passkey = process.env.MPESA_PASSKEY;
+const callbackUrl = process.env.CALLBACK_URL || "https://my-shop-e305a.firebaseapp.com/callback";
+
+// Log configuration status (without exposing secrets)
+console.log("M-Pesa Configuration:");
+console.log("- Consumer Key exists:", !!consumerKey);
+console.log("- Consumer Secret exists:", !!consumerSecret);
+console.log("- Shortcode:", shortcode);
+console.log("- Passkey exists:", !!passkey);
+console.log("- Callback URL:", callbackUrl);
 
 // Generate OAuth token for M-Pesa API
 async function getAccessToken() {
@@ -41,14 +37,32 @@ async function getAccessToken() {
 
 // Lipa Na M-Pesa Online Payment Function
 exports.stkPush = functions.https.onRequest(async (req, res) => {
+  // Enable CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  console.log("STK Push Request received:", req.body);
+  
   const { phone, amount } = req.body;
 
   if (!phone || !amount) {
+    console.error("Missing phone or amount");
     return res.status(400).send({ error: "phone and amount are required" });
   }
 
+  console.log("Credentials check - Key exists:", !!consumerKey, "Secret exists:", !!consumerSecret);
+  console.log("Shortcode:", shortcode, "Passkey:", passkey ? "exists" : "missing");
+
   try {
     const token = await getAccessToken();
+    console.log("Got access token successfully");
+    
     const timestamp = new Date()
       .toISOString()
       .replace(/[^0-9]/g, "")
@@ -65,21 +79,27 @@ exports.stkPush = functions.https.onRequest(async (req, res) => {
       PartyA: phone,
       PartyB: shortcode,
       PhoneNumber: phone,
-      CallBackURL: "https://e57a-38-226-202-118.ngrok-free.app/stkPushCallback",
+      CallBackURL: callbackUrl,
       AccountReference: "MyShop",
       TransactionDesc: "Payment for goods",
     };
 
+    console.log("Sending STK request to Safaricom...");
     const response = await axios.post(
       "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
       stkRequest,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
+    console.log("STK Push response:", response.data);
     res.status(200).send(response.data);
   } catch (error) {
     console.error("STK Push Error:", error.response?.data || error);
-    res.status(500).send({ error: "STK Push failed" });
+    res.status(500).send({ 
+      error: "STK Push failed", 
+      details: error.response?.data || error.message,
+      stack: error.stack 
+    });
   }
 });
 

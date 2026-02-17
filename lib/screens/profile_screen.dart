@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_shop/providers/user_provider.dart';
+import 'package:my_shop/providers/theme_provider.dart';
 import 'package:my_shop/screens/auth/login_screen.dart';
-import 'package:my_shop/widgets/loading_manager.dart';
-import 'package:my_shop/services/image_service.dart';
+import 'package:my_shop/screens/faq_screen.dart';
+import 'package:my_shop/screens/messages_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart'; 
 
 class ProfileScreen extends StatefulWidget {
   static const routeName = "/ProfileScreen";
@@ -22,22 +22,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  
   bool _isLoading = false;
   bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadUserData());
   }
 
   void _loadUserData() {
@@ -45,296 +37,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = userProvider.getUser;
     
     if (user != null) {
-      _nameController.text = user.username;
-      _emailController.text = user.email;
-      // Load phone and address from Firestore if available
+      _nameController.text = userProvider.username;
+      _emailController.text = userProvider.email;
       _loadAdditionalData(user.uid);
     }
   }
 
   Future<void> _loadAdditionalData(String uid) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      
-      if (doc.exists) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists && mounted) {
         final data = doc.data();
-        if (mounted) {
-          setState(() {
-            _phoneController.text = data?['phone'] ?? '';
-            _addressController.text = data?['address'] ?? '';
-          });
-        }
+        setState(() {
+          _phoneController.text = data?['phone'] ?? '';
+          _addressController.text = data?['address'] ?? '';
+        });
       }
     } catch (e) {
       debugPrint('Error loading additional data: $e');
     }
   }
 
-  Future<void> _uploadProfileImage() async {
-    // Show image source selection dialog
-    final source = await showDialog<ImageSource>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Choose Image Source'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (source == null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      // Pick image
-      XFile? imageFile;
-      if (source == ImageSource.gallery) {
-        imageFile = await ImageService.pickImageFromGallery();
-      } else {
-        imageFile = await ImageService.pickImageFromCamera();
-      }
-
-      if (imageFile == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Upload to Cloudinary
-      final imageUrl = await ImageService.uploadImage(imageFile);
-
-      if (imageUrl == null) {
-        throw Exception('Failed to upload image');
-      }
-
-      // Update Firestore
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('No user logged in');
-
-      // Delete old image if exists
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final oldImageUrl = userProvider.getUser?.userImage;
-      if (oldImageUrl != null && oldImageUrl.isNotEmpty) {
-        await ImageService.deleteImage(oldImageUrl);
-      }
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'userImage': imageUrl});
-
-      // Refresh user provider
-      await userProvider.fetchUser();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile image updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error uploading image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('No user logged in');
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final uid = userProvider.uid;
 
-      // Update Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
         'username': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
       });
 
-      // Update display name in Firebase Auth
-      await user.updateDisplayName(_nameController.text.trim());
-
-      // Refresh user provider
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      await userProvider.fetchUser();
-
-      if (mounted) {
-        setState(() => _isEditing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating profile: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Logout'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await FirebaseAuth.instance.signOut();
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        userProvider.clearUser();
-        
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error logging out: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _changePassword() async {
-    final oldPwController = TextEditingController();
-    final newPwController = TextEditingController();
-    final confirmPwController = TextEditingController();
-    
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Change Password'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: oldPwController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Current Password'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: newPwController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'New Password'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: confirmPwController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirm Password'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(c, true), child: const Text('Change')),
-        ],
-      ),
-    );
-
-    if (result != true) return;
-
-    if (newPwController.text != confirmPwController.text) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match')),
-        );
-      }
-      return;
-    }
-
-    try {
-      setState(() => _isLoading = true);
-      final user = FirebaseAuth.instance.currentUser;
-      if (user?.email == null) throw Exception('User email not found');
+      await userProvider.refreshUser(); // Updated to match your UserProvider method
+      if (mounted) setState(() => _isEditing = false);
       
-      // Re-authenticate
-      final credential = EmailAuthProvider.credential(
-        email: user!.email!,
-        password: oldPwController.text,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated!'), backgroundColor: Colors.green),
       );
-      await user.reauthenticateWithCredential(credential);
-      
-      // Update password
-      await user.updatePassword(newPwController.text);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Password changed successfully'), backgroundColor: Colors.green),
-        );
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -343,294 +88,443 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    final user = userProvider.getUser;
-    final isGuest = user == null;
+    final isGuest = userProvider.getUser == null;
 
-    return LoadingManager(
-      isLoading: _isLoading,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Profile'),
-          actions: [
-            if (!isGuest && !_isEditing)
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () {
-                  setState(() => _isEditing = true);
-                },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Profile'),
+        actions: [
+          if (!isGuest)
+            IconButton(
+              icon: Icon(_isEditing ? Icons.close : Icons.edit),
+              onPressed: () => setState(() => _isEditing = !_isEditing),
+            ),
+        ],
+      ),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) 
+        : isGuest ? _buildGuestView() : _buildProfileContent(userProvider),
+    );
+  }
+
+  Widget _buildProfileContent(UserProvider userProvider) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            // Avatar Section
+            CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.blueAccent,
+              child: Text(
+                userProvider.username[0].toUpperCase(),
+                style: const TextStyle(fontSize: 40, color: Colors.white),
               ),
-            if (_isEditing)
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () {
-                  setState(() => _isEditing = false);
-                  _loadUserData();
-                },
+            ),
+            const SizedBox(height: 20),
+            
+            // Editable Fields
+            TextFormField(
+              controller: _nameController,
+              enabled: _isEditing,
+              decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person)),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _emailController,
+              enabled: false, // Email usually stays locked
+              decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _phoneController,
+              enabled: _isEditing,
+              decoration: const InputDecoration(labelText: 'Phone', prefixIcon: Icon(Icons.phone)),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _addressController,
+              enabled: _isEditing,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Shipping Address', prefixIcon: Icon(Icons.location_on)),
+            ),
+            
+            if (_isEditing) ...[
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _updateProfile,
+                style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+                child: const Text('SAVE CHANGES'),
               ),
+            ],
+            
+            const SizedBox(height: 30),
+            
+            // Theme Settings Section
+            _buildThemeSettings(),
+            
+            const SizedBox(height: 20),
+            
+            // Quick Links Section
+            _buildQuickLinks(),
+            
+            const SizedBox(height: 30),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text("Recent Orders", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            const Divider(),
+            _buildOrderHistory(userProvider.uid),
+            
+            const SizedBox(height: 20),
+            TextButton.icon(
+              onPressed: () => userProvider.logout(),
+              icon: const Icon(Icons.logout, color: Colors.red),
+              label: const Text("Logout", style: TextStyle(color: Colors.red)),
+            )
           ],
         ),
-        body: isGuest
-            ? _buildGuestView()
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      // Profile Picture with Edit Button
-                      Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 60,
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            backgroundImage: user.userImage.isNotEmpty
-                                ? NetworkImage(user.userImage)
-                                : null,
-                            child: user.userImage.isEmpty
-                                ? Text(
-                                    user.username.isNotEmpty
-                                        ? user.username[0].toUpperCase()
-                                        : 'U',
-                                    style: const TextStyle(
-                                      fontSize: 48,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : null,
+      ),
+    );
+  }
+
+  Widget _buildOrderHistory(String uid) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('orders')
+          .where('userId', isEqualTo: uid)
+          .orderBy('orderDate', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const LinearProgressIndicator();
+        final orders = snapshot.data!.docs;
+        if (orders.isEmpty) return const Text("No orders found.");
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: orders.length,
+          itemBuilder: (ctx, i) {
+            final data = orders[i].data() as Map<String, dynamic>;
+            final orderDate = data['orderDate'] != null 
+                ? (data['orderDate'] as Timestamp).toDate()
+                : DateTime.now();
+            
+            // Get product details from order items
+            final items = data['items'] as List<dynamic>? ?? [];
+            final productNames = items.map((item) => item['title'] ?? 'Unknown').take(2).join(', ');
+            final moreItems = items.length > 2 ? ' +${items.length - 2} more' : '';
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Order #${orders[i].id.substring(0, 8)}",
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        _buildStatusChip(data['status'] ?? 'pending'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Product: $productNames$moreItems',
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Qty: ${data['totalQuantity'] ?? items.length}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        Text(
+                          'Total: KSH ${data['totalAmount']?.toStringAsFixed(0) ?? '0'}',
+                          style: const TextStyle(
+                            fontSize: 14, 
+                            fontWeight: FontWeight.bold, 
+                            color: Colors.green
                           ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: CircleAvatar(
-                              radius: 20,
-                              backgroundColor: Theme.of(context).colorScheme.primary,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.camera_alt,
-                                  size: 20,
-                                  color: Colors.white,
-                                ),
-                                onPressed: _uploadProfileImage,
-                                padding: EdgeInsets.zero,
-                              ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(orderDate)}',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusChip(String status) {
+    Color color;
+    switch (status.toLowerCase()) {
+      case 'delivered':
+        color = Colors.green;
+        break;
+      case 'shipped':
+        color = Colors.blue;
+        break;
+      case 'processing':
+        color = Colors.orange;
+        break;
+      case 'cancelled':
+        color = Colors.red;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeSettings() {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.palette, size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      'Theme Settings',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Override Toggle
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Use My Theme',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            themeProvider.userOverrideEnabled
+                                ? 'Your preference will be used'
+                                : 'Using global theme (admin set)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-
-                      // Name Field
-                      TextFormField(
-                        controller: _nameController,
-                        enabled: _isEditing,
-                        decoration: InputDecoration(
-                          labelText: 'Full Name',
-                          prefixIcon: const Icon(Icons.person_outline),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    ),
+                    Switch(
+                      value: themeProvider.userOverrideEnabled,
+                      onChanged: (value) => themeProvider.setUserOverrideEnabled(value),
+                    ),
+                  ],
+                ),
+                
+                // Theme Toggle (only visible when user override is enabled)
+                if (themeProvider.userOverrideEnabled) ...[
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Text(
+                        'Theme Mode:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                      const Spacer(),
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.light_mode, size: 18),
+                            label: Text('Light'),
                           ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter your name';
-                          }
-                          return null;
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.dark_mode, size: 18),
+                            label: Text('Dark'),
+                          ),
+                        ],
+                        selected: {themeProvider.isDarkTheme},
+                        onSelectionChanged: (Set<bool> selected) {
+                          themeProvider.setUserTheme(selected.first);
                         },
                       ),
-                      const SizedBox(height: 16),
-
-                      // Email Field (Read-only)
-                      TextFormField(
-                        controller: _emailController,
-                        enabled: false,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                    ],
+                  ),
+                ],
+                
+                // Current theme preview
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: themeProvider.isDarkTheme 
+                        ? Colors.grey.shade800 
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        themeProvider.isDarkTheme 
+                            ? Icons.dark_mode 
+                            : Icons.light_mode,
+                        color: themeProvider.isDarkTheme 
+                            ? Colors.amber 
+                            : Colors.orange,
                       ),
-                      const SizedBox(height: 16),
-
-                      // Phone Field
-                      TextFormField(
-                        controller: _phoneController,
-                        enabled: _isEditing,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: 'Phone Number',
-                          prefixIcon: const Icon(Icons.phone_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Address Field
-                      TextFormField(
-                        controller: _addressController,
-                        enabled: _isEditing,
-                        maxLines: 3,
-                        decoration: InputDecoration(
-                          labelText: 'Address',
-                          prefixIcon: const Icon(Icons.location_on_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Save Button (only visible when editing)
-                      if (_isEditing)
-                        ElevatedButton(
-                          onPressed: _updateProfile,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 48,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Save Changes',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-
-                      // Change Password Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: _changePassword,
-                          child: const Text('Change Password'),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Logout Button
-                      OutlinedButton.icon(
-                        onPressed: _logout,
-                        icon: const Icon(Icons.logout, color: Colors.red),
-                        label: const Text(
-                          'Logout',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 48,
-                            vertical: 16,
-                          ),
-                          side: const BorderSide(color: Colors.red),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Currently using ${themeProvider.isDarkTheme ? "Dark" : "Light"} theme',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: themeProvider.isDarkTheme 
+                              ? Colors.white 
+                              : Colors.black87,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildGuestView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.person_off_outlined,
-              size: 100,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Guest Mode',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'You are browsing as a guest. Sign in to access your profile and save your preferences.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 48,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Sign In',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey.shade600),
-          const SizedBox(width: 12),
-          Text(
-            '$label: ',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+              ],
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickLinks() {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.help_outline, color: Colors.blue),
+            title: const Text('FAQ'),
+            subtitle: const Text('Frequently asked questions'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.pushNamed(context, FAQScreen.routeName),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.message_outlined, color: Colors.green),
+            title: const Text('Messages'),
+            subtitle: const Text('Notifications from admin'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.pushNamed(context, MessagesScreen.routeName),
           ),
         ],
       ),
     );
   }
 
-  String _formatDate(Timestamp timestamp) {
-    final date = timestamp.toDate();
-    return '${date.day}/${date.month}/${date.year}';
+  Widget _buildAdminSection(BuildContext context) {
+    return Card(
+      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.admin_panel_settings, color: Theme.of(context).primaryColor),
+                const SizedBox(width: 8),
+                const Text(
+                  'Admin Panel',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.dashboard, color: Colors.blue),
+              title: const Text('Admin Dashboard'),
+              subtitle: const Text('View stats and manage store'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pushNamed(context, '/admin'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.inventory, color: Colors.green),
+              title: const Text('Manage Products'),
+              subtitle: const Text('Add, edit, or remove products'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pushNamed(context, '/manageProducts'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.people, color: Colors.orange),
+              title: const Text('Manage Users'),
+              subtitle: const Text('View and manage user accounts'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pushNamed(context, '/manageUsers'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.local_shipping, color: Colors.purple),
+              title: const Text('Manage Orders'),
+              subtitle: const Text('Process and track orders'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.pushNamed(context, '/manageOrders'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGuestView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.account_circle, size: 100, color: Colors.grey),
+          const Text("You are browsing as a guest"),
+          ElevatedButton(
+            onPressed: () => Navigator.pushReplacementNamed(context, LoginScreen.routeName),
+            child: const Text("Login / Sign Up"),
+          )
+        ],
+      ),
+    );
   }
 }
