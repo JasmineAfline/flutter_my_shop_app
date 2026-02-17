@@ -107,13 +107,8 @@ class ProductCard extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('${product.title} added to cart'),
-                          duration: const Duration(seconds: 1),
-                          action: SnackBarAction(
-                            label: 'UNDO',
-                            onPressed: () {
-                              cart.removeItem(product.id);
-                            },
-                          ),
+                          duration: const Duration(milliseconds: 800),
+                          behavior: SnackBarBehavior.floating,
                         ),
                       );
                     },

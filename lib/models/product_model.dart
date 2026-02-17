@@ -32,10 +32,17 @@ class Product {
       price: (data['price'] ?? 0).toDouble(),
       imageUrl: data['imageUrl'] ?? '',
       category: data['category'] ?? '',
-      stock: data['stock'] ?? 0,
+      stock: _parseInt(data['stock']),
       isOnSale: data['isOnSale'] ?? false,
       salePrice: data['salePrice']?.toDouble(),
     );
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   Map<String, dynamic> toMap() {

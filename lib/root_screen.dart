@@ -53,7 +53,7 @@ class _RootScreenState extends State<RootScreen> {
         },
         destinations: const [
           NavigationDestination(selectedIcon: Icon(IconlyBold.home), icon: Icon(IconlyLight.home), label: 'Home'),
-          NavigationDestination(selectedIcon: Icon(IconlyBold.search), icon: Icon(IconlyLight.search), label: 'Search'),
+          NavigationDestination(selectedIcon: Icon(IconlyBold.heart), icon: Icon(IconlyLight.heart), label: 'Wishlist'),
           NavigationDestination(selectedIcon: Icon(IconlyBold.bag_2), icon: Icon(IconlyLight.bag_2), label: 'Cart'),
           NavigationDestination(selectedIcon: Icon(IconlyBold.profile), icon: Icon(IconlyLight.profile), label: 'Profile'),
         ],
@@ -267,7 +267,8 @@ class _SearchScreenState extends State<SearchScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('${product.title} added to cart'),
-                  duration: const Duration(seconds: 1),
+                  duration: const Duration(milliseconds: 800),
+                  behavior: SnackBarBehavior.floating,
                 ),
               );
             },
