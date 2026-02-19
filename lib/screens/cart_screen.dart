@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:my_shop/providers/cart_provider.dart';
 import 'package:my_shop/models/cart_model.dart';
 import 'package:my_shop/screens/checkout_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CartScreen extends StatelessWidget {
   static const String routeName = '/cart';
@@ -177,7 +178,18 @@ class CartScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: subtotal <= 0 ? null : () => Navigator.pushNamed(context, CheckoutScreen.routeName),
+                onPressed: subtotal <= 0
+                    ? null
+                    : () {
+                        // Require user to be authenticated (no guests allowed to checkout)
+                        final user = FirebaseAuth.instance.currentUser;
+                        if (user == null || user.isAnonymous) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login to proceed to checkout')));
+                          Navigator.pushNamed(context, '/login');
+                          return;
+                        }
+                        Navigator.pushNamed(context, CheckoutScreen.routeName);
+                      },
                 style: ElevatedButton.styleFrom(backgroundColor: accent, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 4),
                 child: const Text('Proceed to Checkout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),

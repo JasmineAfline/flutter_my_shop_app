@@ -43,7 +43,8 @@ class WishlistScreen extends StatelessWidget {
                 },
               ),
       ),
-      bottomNavigationBar: _buildBottomNav(context, activeIndex: 1),
+      // Navigation is provided by RootScreen when this page is shown inside the app's PageView.
+      // Do not include a local bottom navigation bar to avoid duplicates.
     );
   }
 
@@ -124,41 +125,5 @@ class WishlistScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBottomNav(BuildContext context, {required int activeIndex}) {
-    // Using RootScreen navigation behavior: we simply pop to root and jump
-    return BottomAppBar(
-      color: Colors.white,
-      elevation: 8,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem(context, Icons.home, 'Home', 0, activeIndex==0),
-            _navItem(context, Icons.favorite, 'Wishlist', 1, activeIndex==1),
-            _navItem(context, Icons.shopping_cart, 'Cart', 2, activeIndex==2),
-            _navItem(context, Icons.person, 'Profile', 3, activeIndex==3),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(BuildContext context, IconData icon, String label, int index, bool active) {
-    final color = active ? accent : Colors.grey.shade600;
-    return GestureDetector(
-      onTap: () {
-        // navigate by replacing root's PageView index
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        // Use a small hack: push root route then use existing tab logic isn't trivial here; so just navigate to /home for now
-        if (index == 0) Navigator.pushReplacementNamed(context, '/root');
-        if (index == 2) Navigator.pushNamed(context, '/cart');
-        if (index == 3) Navigator.pushNamed(context, '/profile');
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [Icon(icon, color: color), const SizedBox(height: 4), Text(label, style: TextStyle(color: color, fontSize: 12))],
-      ),
-    );
-  }
+  // Navigation is provided by RootScreen; no local bottom nav here.
 }

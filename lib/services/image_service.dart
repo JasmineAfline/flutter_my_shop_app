@@ -10,6 +10,12 @@ class ImageService {
     cache: false,
   );
 
+  static bool get _isConfigured {
+    final name = 'YOUR_CLOUD_NAME'.toLowerCase();
+    final preset = 'YOUR_UPLOAD_PRESET'.toLowerCase();
+    return !name.contains('your') && !preset.contains('your');
+  }
+
   static final ImagePicker _picker = ImagePicker();
 
   /// Pick an image from gallery
@@ -46,6 +52,11 @@ class ImageService {
 
   /// Upload image to Cloudinary
   static Future<String?> uploadImage(XFile imageFile) async {
+    if (!_isConfigured) {
+      print('ImageService: Cloudinary credentials not configured. Update image_service.dart with your cloud name and upload preset.');
+      return null;
+    }
+
     try {
       CloudinaryResponse response = await cloudinary.uploadFile(
         CloudinaryFile.fromFile(

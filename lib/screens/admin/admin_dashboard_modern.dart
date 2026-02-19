@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:my_shop/providers/user_provider.dart';
 import 'pages/dashboard_page.dart';
-import 'pages/products_page.dart';
+import 'pages/products_page.dart'; // Imports ProductsPage from export
 import 'pages/orders_page.dart';
 import 'pages/users_page.dart';
 import 'pages/help_center_page.dart';
@@ -19,18 +19,27 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   int _currentPage = 0;
-  final List<String> _pageNames = ['Dashboard', 'Products', 'Orders', 'Users', 'Help Center', 'Settings'];
+  final List<String> _pageNames = [
+    'Dashboard',
+    'Products',
+    'Orders',
+    'Users',
+    'Help Center',
+    'Settings'
+  ];
 
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
 
-    // Role-based access control
     if (!userProvider.isAdmin) {
       return Scaffold(
         appBar: AppBar(title: const Text('Access Denied')),
         body: const Center(
-          child: Text('Admin access only', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
+          child: Text(
+            'Admin access only',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
+          ),
         ),
       );
     }
@@ -46,7 +55,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               color: Colors.white,
               child: Column(
                 children: [
-                  // Logo
                   Container(
                     padding: const EdgeInsets.all(24),
                     child: Row(
@@ -58,7 +66,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             color: const Color(0xFF6C63FF),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Center(child: Text('MS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
+                          child: const Center(
+                              child: Text('MS',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))),
                         ),
                         const SizedBox(width: 12),
                         const Column(
@@ -72,7 +82,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ),
                   const Divider(height: 1),
-                  // Navigation Items
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -87,7 +96,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ),
                   ),
                   const Divider(height: 1),
-                  // Logout
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: SizedBox(
@@ -111,7 +119,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Expanded(
             child: Column(
               children: [
-                // Top Bar
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                   decoration: BoxDecoration(
@@ -143,7 +150,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     ],
                   ),
                 ),
-                // Page Content
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(32),

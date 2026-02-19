@@ -24,15 +24,60 @@ try {
     console.log('⚠️ Firebase init error:', err.message);
 }
 
-// Configure CORS properly for all origins
+// Configure CORS properly for all origins & allow Authorization header
 const corsOptions = {
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json());
+
+// --- Firebase token verification middleware ---
+async function verifyFirebaseToken(req, res, next) {
+    if (!admin || !admin.auth) {
+        return res.status(500).json({ error: 'Firebase Admin not initialized on server' });
+    }
+
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader || !authHeader.toString().startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Missing Authorization header with Bearer token' });
+    }
+
+    const idToken = authHeader.toString().split('Bearer ')[1];
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        req.user = decoded; // attach decoded token
+        next();
+    } catch (err) {
+        console.error('Token verification failed:', err.message || err);
+        return res.status(401).json({ error: 'Invalid or expired ID token' });
+    }
+}
+
+// Middleware to require admin role (reads Firestore users/{uid}.role)
+async function requireAdmin(req, res, next) {
+    try {
+        if (!req.user || !req.user.uid) return res.status(401).json({ error: 'Unauthorized' });
+        if (!db) return res.status(500).json({ error: 'Firestore not initialized' });
+
+        const doc = await db.collection('users').doc(req.user.uid).get();
+        const role = doc.exists ? (doc.data()?.role ?? '') : '';
+        if (role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden - admin role required' });
+        }
+        next();
+    } catch (err) {
+        console.error('Admin check failed:', err.message || err);
+        return res.status(500).json({ error: 'Server error' });
+    }
+}
+
+// Example admin-protected route prefix
+app.get('/admin/status', verifyFirebaseToken, requireAdmin, (req, res) => {
+    res.json({ ok: true, uid: req.user.uid, message: 'You are an admin' });
+});
 
 /* ==============================
    1️⃣ Generate Access Token

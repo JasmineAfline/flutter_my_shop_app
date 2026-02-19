@@ -9,9 +9,20 @@ class CloudinaryService {
     cache: false
   );
 
+  static bool get _isConfigured {
+    final name = 'your_cloud_name'.toLowerCase();
+    final preset = 'your_preset_name'.toLowerCase();
+    return !name.contains('your') && !preset.contains('your');
+  }
+
   static Future<String?> uploadImage() async {
+    if (!_isConfigured) {
+      print('CloudinaryService: credentials are not configured. Set your cloud name and preset in cloudinary_service.dart');
+      return null;
+    }
+
     final ImagePicker picker = ImagePicker();
-    
+
     // 1. Pick the image from gallery
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
 

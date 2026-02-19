@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:my_shop/screens/admin/screens/add_product_screen.dart' as addProduct;
 import 'package:provider/provider.dart';
 
 import 'package:my_shop/constants/theme_data.dart';
@@ -19,7 +20,6 @@ import 'package:my_shop/screens/cart_screen.dart' as cart;
 import 'package:my_shop/screens/faq_screen.dart';
 import 'package:my_shop/screens/messages_screen.dart';
 import 'package:my_shop/screens/admin/admin_dashboard_modern.dart' as adminScreen;
-import 'package:my_shop/screens/admin/screens/add_product_screen.dart';
 import 'package:my_shop/screens/admin/screens/manage_products.dart';
 import 'package:my_shop/screens/admin/screens/manage_orders.dart';
 import 'package:my_shop/screens/admin/screens/manage_users.dart';
@@ -94,7 +94,7 @@ class MyApp extends StatelessWidget {
         },
         '/addProduct': (context) {
           final userProvider = Provider.of<UserProvider>(context);
-          if (userProvider.isAdmin) return const AddProductScreen();
+          if (userProvider.isAdmin) return const addProduct.ProductFormScreen();
           return const RootScreen();
         },
         '/manageProducts': (context) {

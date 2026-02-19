@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MpesaService {
   // Base URL for STK Push - Using local mpesa-server with ngrok
@@ -11,15 +12,25 @@ class MpesaService {
   // 3. Copy the ngrok URL (e.g., https://abc123.ngrok-free.app) and update below
   // 
   // NOTE: ngrok URLs are temporary - you'll need to update this when ngrok restarts
-  String baseUrl = "https://cac6-38-226-202-118.ngrok-free.app";
+  String baseUrl ="http://localhost:3001";
 
   Future<void> stkPush(String phone, int amount) async {
     try {
+      // Get current user's ID token to authenticate request to backend
+      final user = FirebaseAuth.instance.currentUser;
+      String? idToken;
+      if (user != null) {
+        idToken = await user.getIdToken();
+      }
+
+      final headers = {
+        "Content-Type": "application/json",
+      };
+      if (idToken != null) headers['Authorization'] = 'Bearer $idToken';
+
       final response = await http.post(
         Uri.parse("$baseUrl/stkpush"),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: headers,
         body: jsonEncode({
           "phone": phone,
           "amount": amount,
