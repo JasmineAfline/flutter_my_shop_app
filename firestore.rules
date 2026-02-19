@@ -8,14 +8,15 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Helper function to check if user is admin
+    // Helper function to check if user is admin (by reading their user document)
     function isAdmin() {
-      return isAuthenticated() && request.auth.token.admin == true;
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // Settings collection - readable by authenticated users, writable by admins
+    // Settings collection - readable by all, writable by admins only
     match /settings/{document=**} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isAdmin();
     }
     
@@ -53,6 +54,20 @@ service cloud.firestore {
     // Cart collection - private to each user
     match /carts/{userId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // FAQ collection - readable by all, writable by admins
+    match /faqs/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // Help messages collection - users can read/write their own, admins can access all
+    match /helpMessages/{msgId} {
+      allow read: if isAuthenticated() && 
+                   (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

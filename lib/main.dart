@@ -7,6 +7,7 @@ import 'package:my_shop/firebase_options.dart';
 import 'package:my_shop/providers/theme_provider.dart';
 import 'package:my_shop/providers/user_provider.dart';
 import 'package:my_shop/providers/cart_provider.dart';
+import 'package:my_shop/providers/wishlist_provider.dart';
 
 import 'package:my_shop/screens/auth/login_screen.dart';
 import 'package:my_shop/screens/register_screen.dart';
@@ -17,11 +18,14 @@ import 'package:my_shop/screens/checkout_screen.dart';
 import 'package:my_shop/screens/cart_screen.dart' as cart;
 import 'package:my_shop/screens/faq_screen.dart';
 import 'package:my_shop/screens/messages_screen.dart';
-import 'package:my_shop/screens/admin/admin_dashboard.dart';
+import 'package:my_shop/screens/admin/admin_dashboard_modern.dart' as adminScreen;
 import 'package:my_shop/screens/admin/screens/add_product_screen.dart';
 import 'package:my_shop/screens/admin/screens/manage_products.dart';
 import 'package:my_shop/screens/admin/screens/manage_orders.dart';
 import 'package:my_shop/screens/admin/screens/manage_users.dart';
+import 'package:my_shop/screens/product_details_screen.dart';
+import 'package:my_shop/screens/all_products_screen.dart';
+import 'package:my_shop/screens/admin/mpesa_logs.dart';
 import 'package:my_shop/root_screen.dart';
 
 void main() async {
@@ -36,6 +40,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
+        ChangeNotifierProvider(create: (_) => WishlistProvider()),
       ],
       child: const MyApp(),
     ),
@@ -79,12 +84,12 @@ class MyApp extends StatelessWidget {
         // FIX: Removed the cartItems and total parameters
         CheckoutScreen.routeName: (context) {
           final userProvider = Provider.of<UserProvider>(context);
-          if (userProvider.isAdmin) return const AdminDashboard();
+          if (userProvider.isAdmin) return adminScreen.AdminDashboard(key: UniqueKey());
           return const CheckoutScreen();
         },
         '/admin': (context) {
           final userProvider = Provider.of<UserProvider>(context);
-          if (userProvider.isAdmin) return const AdminDashboard();
+          if (userProvider.isAdmin) return adminScreen.AdminDashboard(key: UniqueKey());
           return const RootScreen(); // Redirect non-admins back to safety
         },
         '/addProduct': (context) {
@@ -107,6 +112,9 @@ class MyApp extends StatelessWidget {
           if (userProvider.isAdmin) return const ManageUsers();
           return const RootScreen();
         },
+        '/all-products': (context) => const AllProductsScreen(),
+        '/mpesa-logs': (context) => const MpesaLogsScreen(),
+        ProductDetailsScreen.routeName: (context) => const ProductDetailsScreen(),
       },
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
@@ -148,7 +156,7 @@ class AuthWrapper extends StatelessWidget {
         if (userProvider.getUser != null) {
           // Check if user is admin and route accordingly
           if (userProvider.isAdmin) {
-            return const AdminDashboard();
+            return adminScreen.AdminDashboard(key: UniqueKey());
           }
           return const RootScreen();
         }

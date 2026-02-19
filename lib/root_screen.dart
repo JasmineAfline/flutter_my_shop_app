@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iconly/iconly.dart';
 import 'package:provider/provider.dart';
 import 'package:my_shop/screens/home_screen.dart';
+import 'package:my_shop/screens/wishlist_screen.dart';
 import 'package:my_shop/screens/profile_screen.dart';
 import 'package:my_shop/screens/cart_screen.dart';
 import 'package:my_shop/models/product_model.dart';
@@ -22,7 +23,7 @@ class _RootScreenState extends State<RootScreen> {
 
   final List<Widget> screens = [
     const HomeScreen(),
-    const SearchScreen(),
+    const WishlistScreen(),
     const CartScreen(), // Using the imported CartScreen from cart_screen.dart
     const ProfileScreen(),
   ];

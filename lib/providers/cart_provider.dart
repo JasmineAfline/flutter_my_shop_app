@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:my_shop/models/cart_model.dart';
 import 'package:my_shop/models/product_model.dart';
 
@@ -6,6 +9,12 @@ import 'package:my_shop/models/product_model.dart';
 class CartProvider with ChangeNotifier {
   // Use a Map of the Model for faster lookups by ID
   Map<String, CartItem> _cartItems = {};
+
+  static const _prefsKey = 'cart_items';
+
+  CartProvider() {
+    _loadFromPrefs();
+  }
 
   Map<String, CartItem> get cartItems => _cartItems;
 
@@ -38,11 +47,13 @@ class CartProvider with ChangeNotifier {
       ));
     }
     notifyListeners();
+    _saveToPrefs();
   }
 
   void removeItem(String productId) {
     _cartItems.remove(productId);
     notifyListeners();
+    _saveToPrefs();
   }
 
   void updateQuantity(String productId, int quantity) {
@@ -59,6 +70,7 @@ class CartProvider with ChangeNotifier {
         ));
       }
       notifyListeners();
+      _saveToPrefs();
     }
   }
 
@@ -69,5 +81,40 @@ class CartProvider with ChangeNotifier {
   void clearCart() {
     _cartItems.clear();
     notifyListeners();
+    _saveToPrefs();
+  }
+
+  Future<void> _saveToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final Map<String, Map<String, dynamic>> map = {};
+      _cartItems.forEach((key, item) {
+        map[key] = item.toMap();
+      });
+      await prefs.setString(_prefsKey, jsonEncode(map));
+    } catch (e) {
+      debugPrint('Error saving cart to prefs: $e');
+    }
+  }
+
+  Future<void> _loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsKey);
+      if (raw == null || raw.isEmpty) return;
+      final Map<String, dynamic> decoded = jsonDecode(raw);
+      final Map<String, CartItem> loaded = {};
+      decoded.forEach((key, value) {
+        try {
+          loaded[key] = CartItem.fromMap(Map<String, dynamic>.from(value));
+        } catch (e) {
+          debugPrint('Skipping invalid cart item $key: $e');
+        }
+      });
+      _cartItems = loaded;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading cart from prefs: $e');
+    }
   }
 }

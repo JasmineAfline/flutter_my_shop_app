@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:my_shop/screens/register_screen.dart';
 import 'package:my_shop/google_button.dart';
-import 'package:my_shop/screens/admin/admin_dashboard.dart';
+import 'package:my_shop/screens/admin/admin_dashboard_modern.dart' as admin;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -69,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // 🔥 Route based on role
       if (role == 'admin') {
         Navigator.pushReplacementNamed(
-            context, AdminDashboard.routeName);
+            context, admin.AdminDashboard.routeName);
       } else {
         Navigator.pushReplacementNamed(context, '/root');
       }

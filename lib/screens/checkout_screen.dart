@@ -56,9 +56,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             child: SizedBox(
                               width: 50,
                               height: 50,
-                              child: (item.imageUrl != null && item.imageUrl!.isNotEmpty)
+                              child: (item.imageUrl.isNotEmpty)
                                   ? Image.network(
-                                      item.imageUrl!,
+                                      item.imageUrl,
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) => Container(
                                         color: Colors.grey[200],
@@ -72,7 +72,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ),
                           title: Text(
-                            item.title ?? "No title",
+                            item.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

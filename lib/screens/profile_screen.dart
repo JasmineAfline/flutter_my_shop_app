@@ -95,9 +95,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('My Profile'),
         actions: [
           if (!isGuest)
-            IconButton(
-              icon: Icon(_isEditing ? Icons.close : Icons.edit),
-              onPressed: () => setState(() => _isEditing = !_isEditing),
+            Padding(
+              padding: const EdgeInsets.only(right:12.0),
+              child: TextButton.icon(
+                onPressed: () => setState(() => _isEditing = !_isEditing),
+                icon: Icon(_isEditing ? Icons.close : Icons.edit, color: Colors.black),
+                label: Text(_isEditing ? 'Close' : 'Edit', style: const TextStyle(color: Colors.black)),
+              ),
             ),
         ],
       ),
@@ -160,30 +164,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
             
-            const SizedBox(height: 30),
-            
+            const SizedBox(height: 24),
+
             // Theme Settings Section
             _buildThemeSettings(),
-            
+
             const SizedBox(height: 20),
-            
+
             // Quick Links Section
             _buildQuickLinks(),
-            
-            const SizedBox(height: 30),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text("Recent Orders", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+
+            const SizedBox(height: 24),
+
+            // Recent Orders header with View All
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Recent Orders', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                TextButton(
+                  onPressed: () => Navigator.pushNamed(context, '/manageOrders'),
+                  child: const Text('View All'),
+                )
+              ],
             ),
             const Divider(),
             _buildOrderHistory(userProvider.uid),
-            
-            const SizedBox(height: 20),
-            TextButton.icon(
-              onPressed: () => userProvider.logout(),
-              icon: const Icon(Icons.logout, color: Colors.red),
-              label: const Text("Logout", style: TextStyle(color: Colors.red)),
-            )
+
+            const SizedBox(height: 24),
+            // Logout as prominent action
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => userProvider.logout(),
+                icon: const Icon(Icons.logout),
+                label: const Text('Logout'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4D4F), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+            ),
           ],
         ),
       ),
@@ -455,59 +472,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () => Navigator.pushNamed(context, MessagesScreen.routeName),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAdminSection(BuildContext context) {
-    return Card(
-      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.admin_panel_settings, color: Theme.of(context).primaryColor),
-                const SizedBox(width: 8),
-                const Text(
-                  'Admin Panel',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              leading: const Icon(Icons.dashboard, color: Colors.blue),
-              title: const Text('Admin Dashboard'),
-              subtitle: const Text('View stats and manage store'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.pushNamed(context, '/admin'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.inventory, color: Colors.green),
-              title: const Text('Manage Products'),
-              subtitle: const Text('Add, edit, or remove products'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.pushNamed(context, '/manageProducts'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.people, color: Colors.orange),
-              title: const Text('Manage Users'),
-              subtitle: const Text('View and manage user accounts'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.pushNamed(context, '/manageUsers'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.local_shipping, color: Colors.purple),
-              title: const Text('Manage Orders'),
-              subtitle: const Text('Process and track orders'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.pushNamed(context, '/manageOrders'),
-            ),
-          ],
-        ),
       ),
     );
   }

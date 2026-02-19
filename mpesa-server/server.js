@@ -2,8 +2,27 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
+const admin = require('firebase-admin');
 
 const app = express();
+
+// Initialize Firebase Admin (requires FIREBASE_KEY env var pointing to json key file)
+let db;
+try {
+    const keyFile = process.env.FIREBASE_KEY;
+    if (keyFile) {
+        const serviceAccount = require(keyFile);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+        db = admin.firestore();
+        console.log('✅ Firebase Admin initialized');
+    } else {
+        console.log('⚠️ FIREBASE_KEY not set - Firebase logging disabled');
+    }
+} catch (err) {
+    console.log('⚠️ Firebase init error:', err.message);
+}
 
 // Configure CORS properly for all origins
 const corsOptions = {
@@ -98,6 +117,25 @@ app.post('/stkpush', async (req, res) => {
 
         res.status(200).json(response.data);
 
+        // Record STK push in Firestore as pending
+        if (db) {
+            try {
+                const checkoutId = response.data.CheckoutRequestID;
+                await db.collection('payments').doc(checkoutId).set({
+                    phone: phone,
+                    amount: Number(amount),
+                    merchantRequestID: response.data.MerchantRequestID,
+                    checkoutRequestID: checkoutId,
+                    status: 'pending',
+                    description: 'STK Push sent to customer',
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                }, { merge: true });
+                console.log('✅ Payment record created:', checkoutId);
+            } catch (err) {
+                console.log('⚠️ Firestore write error:', err.message);
+            }
+        }
+
     } catch (error) {
         console.error("🔴 STK Error:", error.response?.data || error.message);
         res.status(500).json(error.response?.data || { error: "STK failed" });
@@ -111,6 +149,48 @@ app.post('/callback', (req, res) => {
 
     console.log("📩 Callback Received:");
     console.log(JSON.stringify(req.body, null, 2));
+
+    // Update Firestore with callback result
+    if (db) {
+        try {
+            const callback = req.body.Body?.stkCallback;
+            if (callback) {
+                const checkoutId = callback.CheckoutRequestID;
+                const resultCode = callback.ResultCode;
+                const resultDesc = callback.ResultDesc || '';
+
+                let status = 'pending';
+                if (resultCode === 0) {
+                    status = 'completed';
+                } else if (resultCode === 1032) {
+                    status = 'cancelled';
+                } else if (resultCode === 1037) {
+                    status = 'no_response';
+                } else {
+                    status = 'error';
+                }
+
+                db.collection('payments').doc(checkoutId).update({
+                    status: status,
+                    resultCode: resultCode,
+                    resultDesc: resultDesc,
+                    callbackReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }).catch(err => {
+                    // If update fails, try set with merge
+                    console.log('Update failed, trying set:', err.message);
+                    db.collection('payments').doc(checkoutId).set({
+                        status: status,
+                        resultCode: resultCode,
+                        resultDesc: resultDesc,
+                        callbackReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    }, { merge: true });
+                });
+                console.log('✅ Payment status updated:', checkoutId, '→', status);
+            }
+        } catch (err) {
+            console.log('⚠️ Callback Firestore error:', err.message);
+        }
+    }
 
     res.status(200).send("OK");
 });
